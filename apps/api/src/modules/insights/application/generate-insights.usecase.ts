@@ -5,18 +5,21 @@ import { InsightRecord, InsightRepository } from '../domain/insight.repository';
 import { runHeuristicPipeline } from '../domain/heuristic-engine';
 import { runCrossDomainPipeline } from '../domain/cross-domain-engine';
 import { dayKeyUtc } from '../../events/domain/day-key';
+import { IndexDocumentUseCase } from '../../search/application/index-document.usecase';
 
 const LOOKBACK_DAYS = 45;
 
 /**
  * Gera insights M3 (intra) + M5 (cross-domain) (docs/12 §7, docs/20 §2.5).
  * Idempotente por fingerprint; respeita status dismissed/useful.
+ * Indexa título/corpo no M6 (best-effort).
  */
 @Injectable()
 export class GenerateInsightsUseCase {
   constructor(
     private readonly events: EventRepository,
     private readonly insights: InsightRepository,
+    private readonly indexer: IndexDocumentUseCase,
   ) {}
 
   async execute(userId: string): Promise<{ generated: number; items: InsightRecord[] }> {
@@ -65,7 +68,9 @@ export class GenerateInsightsUseCase {
 
     const items: InsightRecord[] = [];
     for (const c of candidates) {
-      items.push(await this.insights.upsertCandidate(userId, c));
+      const record = await this.insights.upsertCandidate(userId, c);
+      items.push(record);
+      await this.indexer.indexInsightSafe(userId, record.id, record.title, record.body);
     }
     return { generated: items.length, items };
   }

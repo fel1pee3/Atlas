@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SearchModule } from '../search/search.module';
 import { EventRepository } from '../events/domain/event.repository';
 import { PrismaEventRepository } from '../events/infrastructure/prisma-event.repository';
 import { InsightsController } from './interface/insights.controller';
@@ -14,6 +15,7 @@ import { PrismaInsightRepository } from './infrastructure/prisma-insight.reposit
  * Reusa a porta EventRepository (adapter Prisma) no monólito modular.
  */
 @Module({
+  imports: [SearchModule],
   controllers: [InsightsController],
   providers: [
     GenerateInsightsUseCase,

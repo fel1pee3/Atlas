@@ -12,6 +12,7 @@ import {
 } from '../domain/event.repository';
 import { DailyProjectionPort, DailySummary } from '../domain/daily-projection.port';
 import { EVENT_SOURCES, EVENT_TYPES } from '@atlas/shared';
+import { IndexDocumentUseCase } from '../../search/application/index-document.usecase';
 
 class InMemoryEventRepository extends EventRepository {
   public appended: AppendEventInput[] = [];
@@ -68,7 +69,10 @@ describe('IngestEventBatchUseCase', () => {
   it('ingere o lote e projeta cada evento criado', async () => {
     const repo = new InMemoryEventRepository();
     const projections = new FakeDailyProjection();
-    const ingest = new IngestEventUseCase(repo, projections);
+    const indexer = {
+      indexEventSafe: jest.fn().mockResolvedValue(undefined),
+    } as unknown as IndexDocumentUseCase;
+    const ingest = new IngestEventUseCase(repo, projections, indexer);
     const batch = new IngestEventBatchUseCase(ingest);
     const userId = '11111111-1111-1111-1111-111111111111';
 

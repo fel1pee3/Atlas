@@ -71,6 +71,7 @@ export default function TimelineScreen() {
             onOpenHealth={() => router.push('/(app)/health')}
             onOpenSources={() => router.push('/(app)/sources')}
             onOpenInsights={() => router.push('/(app)/insights')}
+            onOpenSearch={() => router.push('/(app)/search')}
           />
         }
         ListEmptyComponent={
@@ -112,17 +113,22 @@ function TodaySummary({
   onOpenHealth,
   onOpenSources,
   onOpenInsights,
+  onOpenSearch,
 }: {
   daily: DailySummary | null;
   onOpenHealth: () => void;
   onOpenSources: () => void;
   onOpenInsights: () => void;
+  onOpenSearch: () => void;
 }) {
   return (
     <View style={styles.today}>
       <View style={styles.todayHeader}>
         <Text style={styles.todayTitle}>Hoje</Text>
         <View style={styles.todayLinks}>
+          <Pressable onPress={onOpenSearch}>
+            <Text style={styles.healthLink}>Busca</Text>
+          </Pressable>
           <Pressable onPress={onOpenInsights}>
             <Text style={styles.healthLink}>Insights</Text>
           </Pressable>

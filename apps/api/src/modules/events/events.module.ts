@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { SearchModule } from '../search/search.module';
 import { EventsController } from './interface/events.controller';
 import { IngestEventUseCase } from './application/ingest-event.usecase';
 import { IngestEventBatchUseCase } from './application/ingest-event-batch.usecase';
@@ -15,6 +16,7 @@ import { PrismaDailyProjection } from './infrastructure/prisma-daily-projection'
  * Portas EventRepository e DailyProjectionPort ligadas aos adapters Prisma.
  */
 @Module({
+  imports: [SearchModule],
   controllers: [EventsController],
   providers: [
     IngestEventUseCase,

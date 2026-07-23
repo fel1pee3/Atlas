@@ -1,6 +1,6 @@
 # 31 — Getting Started (Docs → Código)
 
-> **Fase:** 🟢 MVP · **Marco atual:** **M5** (Insight cross-domain — prova da tese) · **Leia antes:** [`20_MVP.md`](20_MVP.md) §2.5 / §5
+> **Fase:** 🟢 MVP · **Marco atual:** **M6** (Busca semântica — pgvector + Gemini Embeddings) · **Leia antes:** [`20_MVP.md`](20_MVP.md) §2.4 · [`14_Vector_Search.md`](14_Vector_Search.md)
 > **Objetivo:** colocar o Atlas rodando localmente e explicar a estrutura do código.
 
 ---
@@ -9,50 +9,70 @@
 
 | Marco | Status |
 |---|---|
-| M0–M4 | ✅ |
-| **M5 Insight cross-domain** | ✅ |
+| M0–M5 | ✅ |
+| **M6 Busca semântica** | ✅ |
 
-### M5 — o que entrou
+### M6 — o que entrou
 
-Insights-alvo do [`20_MVP.md`](20_MVP.md) §2.5, por **estatística** (sem LLM), com evidências:
+Busca em linguagem natural sobre o CMHL com **pgvector** + **Gemini Embeddings** (tier gratuito — **não** é chat/LLM):
 
-1. **Sono após treino tarde** — médias condicionais (Health × Health no tempo)
-2. **Gastos em dias com >4 reuniões** — Calendar × gasto
-3. **Humor em dias >10h fora de casa** — Location × humor
+- ✅ Tabelas `embeddings` + `embedding_cache` (vector 768, índice HNSW cosine)
+- ✅ `EmbeddingProvider` abstrato + `GeminiEmbeddingProvider` (`gemini-embedding-001`)
+- ✅ Indexação best-effort na ingestão de eventos e na geração de insights
+- ✅ Cache por `sha256(conteúdo)` — não re-chama a API se o texto não mudou
+- ✅ `GET /api/search?q=&mode=semantic|keyword` + `POST /api/search/reindex`
+- ✅ Tela **Busca** no mobile (Hoje → Busca)
 
-- ✅ `cross-domain-engine.ts` + kinds `cross.*` em `@atlas/shared`
-- ✅ Pipeline de geração carrega todos os tipos necessários
-- ✅ Demos semeiam correlações sintéticas (rastreáveis com `source=demo`) para dogfooding
-- ✅ UI: badge **cross-domain**, borda destacada, aviso “associação ≠ causa”
+Modelo padrão: `gemini-embedding-001` com `outputDimensionality=768` (free tier no Gemini API). Chat Gemini/OpenAI **não** é usado no M6.
 
 ---
 
-## 2. Como validar a prova
+## 2. Ativar busca semântica (Gemini)
 
-```bash
-npm run dev:api
-# Expo:
-# 1) Saúde → Conectar Demo (re-sync se já tinha dados antigos de sono)
-# 2) Fontes → Demo localização + Demo agenda
-# 3) Insights → pull to refresh
+1. Crie uma API key em [Google AI Studio](https://aistudio.google.com/apikey)
+2. No `.env` da raiz:
+
+```env
+EMBEDDING_PROVIDER=gemini
+GEMINI_API_KEY=sua_chave_aqui
 ```
 
-Você deve ver cards `cross-domain` com evidências clicáveis.
+(`EMBEDDINGS_MODEL` / `EMBEDDINGS_DIMENSIONS` já têm default no código.)
 
-> Se os dados Demo antigos (pré-M5) ainda estiverem no SQLite sem treinos/gastos/humor demo,
-> desative/reative os conectores ou limpe o app data para reimportar.
+3. Reinicie a API (`npm run dev:api`)
+4. No app: **Busca → Reindexar memória** (para eventos/insights já existentes)
+5. Pesquise algo como `ansiedade` ou `reunião` (notas/calendário Demo ajudam)
+
+Sem chave (`EMBEDDING_PROVIDER=none`): app e insights continuam ok; use `mode=keyword` na busca ou ative o Gemini.
 
 ---
 
-## 3. Próximos passos (pós-prova)
+## 3. Como validar
 
-Pelo roadmap [`20`](20_MVP.md) / [`21`](21_Roadmap.md), depois do M5 tipicamente:
+```bash
+npm run infra:up
+cd apps/api && npx dotenv -e ../../.env -- prisma migrate deploy
+npm run dev:api
+# Expo: Hoje → Busca
+```
 
-- **Privacidade MVP:** export/delete total (ainda 🟢 no escopo do MVP)
-- **Busca semântica (pgvector)** — se ainda não fechada
-- **V1:** conectores nativos reais, LLM só para redigir, etc.
+Checklist:
+
+1. Registrar uma nota manual (“fico nervoso na véspera da prova”)
+2. Com Gemini ligado, buscar “ansiedade antes de exame” → deve achar a nota
+3. Keyword mode acha por substring mesmo sem embeddings
+
+---
+
+## 4. Próximos passos
+
+Pelo roadmap [`20`](20_MVP.md) / [`21`](21_Roadmap.md):
+
+- **M7 — Privacidade MVP:** export/delete total (inclui embeddings)
+- **M8 — Hardening**
+- **V1:** conectores nativos reais; LLM só para redigir (opt-in)
 
 ---
 
 ### Resumo
-O Atlas agora **cruza domínios** com estatística explicável. Isso é a prova da tese do produto.
+O CMHL agora é **interrogável por significado** via Gemini Embeddings + pgvector, sem chatbot.

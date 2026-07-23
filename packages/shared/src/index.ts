@@ -7,3 +7,4 @@ export * from './events/payloads';
 export * from './events/event';
 export * from './insights/insight-types';
 export * from './insights/insight-schemas';
+export * from './search/embeddable-text';

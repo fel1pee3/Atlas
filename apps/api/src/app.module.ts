@@ -4,10 +4,11 @@ import { HealthModule } from './modules/health/health.module';
 import { IdentityModule } from './modules/identity/identity.module';
 import { EventsModule } from './modules/events/events.module';
 import { InsightsModule } from './modules/insights/insights.module';
+import { SearchModule } from './modules/search/search.module';
 
 /**
  * Módulo raiz — compõe os bounded contexts do monólito modular (docs/09 §4).
- * Novos módulos (ingestion, privacy, search) entram aqui por fase.
+ * Novos módulos (ingestion, privacy) entram aqui por fase.
  */
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { InsightsModule } from './modules/insights/insights.module';
     HealthModule,
     EventsModule,
     InsightsModule,
+    SearchModule,
   ],
 })
 export class AppModule {}

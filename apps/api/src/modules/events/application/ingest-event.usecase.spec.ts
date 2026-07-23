@@ -11,6 +11,7 @@ import {
 } from '../domain/event.repository';
 import { DailyProjectionPort, DailySummary } from '../domain/daily-projection.port';
 import { EVENT_SOURCES, EVENT_TYPES } from '@atlas/shared';
+import { IndexDocumentUseCase } from '../../search/application/index-document.usecase';
 
 /** Repositório fake em memória — testa o caso de uso sem banco (docs/26_Testing.md). */
 class InMemoryEventRepository extends EventRepository {
@@ -78,12 +79,18 @@ describe('IngestEventUseCase', () => {
   const userId = '11111111-1111-1111-1111-111111111111';
   let repo: InMemoryEventRepository;
   let projections: FakeDailyProjection;
+  let indexer: { indexEventSafe: jest.Mock };
   let useCase: IngestEventUseCase;
 
   beforeEach(() => {
     repo = new InMemoryEventRepository();
     projections = new FakeDailyProjection();
-    useCase = new IngestEventUseCase(repo, projections);
+    indexer = { indexEventSafe: jest.fn().mockResolvedValue(undefined) };
+    useCase = new IngestEventUseCase(
+      repo,
+      projections,
+      indexer as unknown as IndexDocumentUseCase,
+    );
   });
 
   it('valida o payload e persiste um evento de humor manual', async () => {
@@ -142,7 +149,11 @@ describe('IngestEventUseCase', () => {
         };
       }
     })();
-    const uc = new IngestEventUseCase(idempotentRepo, projections);
+    const uc = new IngestEventUseCase(
+      idempotentRepo,
+      projections,
+      indexer as unknown as IndexDocumentUseCase,
+    );
 
     await uc.execute({
       userId,
@@ -154,5 +165,6 @@ describe('IngestEventUseCase', () => {
     });
 
     expect(projections.applied).toHaveLength(0);
+    expect(indexer.indexEventSafe).not.toHaveBeenCalled();
   });
 });

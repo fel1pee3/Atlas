@@ -17,6 +17,7 @@ export default function AppLayout() {
       <Stack.Screen name="sources" options={{ title: 'Espaço & agenda' }} />
       <Stack.Screen name="insights" options={{ title: 'Insights' }} />
       <Stack.Screen name="insight/[id]" options={{ title: 'Insight' }} />
+      <Stack.Screen name="search" options={{ title: 'Busca' }} />
     </Stack>
   );
 }

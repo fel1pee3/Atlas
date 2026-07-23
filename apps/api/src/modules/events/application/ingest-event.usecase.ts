@@ -5,6 +5,7 @@ import {
   EventRepository,
 } from '../domain/event.repository';
 import { DailyProjectionPort } from '../domain/daily-projection.port';
+import { IndexDocumentUseCase } from '../../search/application/index-document.usecase';
 
 export interface IngestEventCommand {
   userId: string;
@@ -18,13 +19,14 @@ export interface IngestEventCommand {
 /**
  * Caso de uso: ingerir um evento (docs/11_Event_Model.md §4).
  * Regras: valida payload por tipo; persiste idempotente; projeta read models
- * diários quando created=true (docs/11 §5.1).
+ * diários quando created=true (docs/11 §5.1); indexa texto no M6 (best-effort).
  */
 @Injectable()
 export class IngestEventUseCase {
   constructor(
     private readonly events: EventRepository,
     private readonly projections: DailyProjectionPort,
+    private readonly indexer: IndexDocumentUseCase,
   ) {}
 
   async execute(cmd: IngestEventCommand): Promise<AppendResult> {
@@ -46,6 +48,12 @@ export class IngestEventUseCase {
         occurredAt: result.event.occurredAt,
         payload: result.event.payload,
       });
+      await this.indexer.indexEventSafe(
+        result.event.userId,
+        result.event.id,
+        result.event.type,
+        result.event.payload,
+      );
     }
 
     return result;

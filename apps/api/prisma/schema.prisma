@@ -1,7 +1,6 @@
 // =============================================================================
-// Atlas — schema Prisma (M0–M4). Ver docs/10_Database_Design.md e docs/11_Event_Model.md
-// Store primário único no MVP: PostgreSQL (ADR-0004). pgvector/entities/insights
-// entram em marcos posteriores (M6+), mantendo o MVP enxuto.
+// Atlas — schema Prisma (M0–M6). Ver docs/10_Database_Design.md e docs/11_Event_Model.md
+// Store primário único no MVP: PostgreSQL + pgvector (ADR-0004 / M6).
 // =============================================================================
 
 generator client {
@@ -30,6 +29,7 @@ model User {
   dailyPlaces     RmDailyPlaces[]
   dailyCalendars  RmDailyCalendar[]
   insights        Insight[]
+  embeddings      Embedding[]
 
   @@map("users")
 }
@@ -196,4 +196,34 @@ model InsightEvidence {
 
   @@id([insightId, eventId])
   @@map("insight_evidence")
+}
+
+/// Vetores semânticos (M6 — docs/10 §4, docs/14). Coluna `embedding` via SQL cru (pgvector).
+model Embedding {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  ownerType   String   @map("owner_type")
+  ownerId     String   @map("owner_id") @db.Uuid
+  contentHash String   @map("content_hash")
+  model       String
+  /// pgvector — lido/escrito com $executeRaw / $queryRaw.
+  embedding   Unsupported("vector")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerType, ownerId, model])
+  @@index([userId, contentHash, model])
+  @@map("embeddings")
+}
+
+/// Cache global de vetores por hash de conteúdo + modelo (docs/14 §8.2).
+model EmbeddingCache {
+  contentHash String   @map("content_hash")
+  model       String
+  embedding   Unsupported("vector")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@id([contentHash, model])
+  @@map("embedding_cache")
 }
