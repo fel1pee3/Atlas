@@ -4,24 +4,25 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ZodError } from 'zod';
+import { getPino } from '../logging/pino-logger';
+import type { RequestWithId } from './request-id.middleware';
 
 /**
- * Traduz TODA exceção para o formato RFC 7807 (application/problem+json).
- * Ver docs/17_API_Design.md (erros padronizados). Mantém o contrato de erro
- * consistente entre a API e o cliente mobile.
+ * Traduz TODA exceção para RFC 7807 (application/problem+json) + traceId (M8).
+ * Ver docs/17_API_Design.md.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger(AllExceptionsFilter.name);
+  private readonly log = getPino().child({ component: 'exceptions' });
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const res = ctx.getResponse<Response>();
-    const req = ctx.getRequest<{ url?: string }>();
+    const req = ctx.getRequest<RequestWithId>();
+    const traceId = req?.requestId;
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let title = 'Erro interno';
@@ -41,13 +42,26 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const body = exception.getResponse();
       title = exception.name;
       detail = typeof body === 'string' ? body : ((body as { message?: string }).message ?? title);
+      if (Array.isArray((body as { message?: unknown }).message)) {
+        detail = ((body as { message: string[] }).message).join('; ');
+      }
       if (typeof body === 'object') errors = (body as { errors?: unknown }).errors;
     } else if (exception instanceof Error) {
       detail = exception.message;
     }
 
     if (status >= 500) {
-      this.logger.error(exception instanceof Error ? exception.stack : String(exception));
+      this.log.error(
+        {
+          traceId,
+          err: exception instanceof Error ? exception.message : String(exception),
+          stack: exception instanceof Error ? exception.stack : undefined,
+          path: req?.url,
+        },
+        'unhandled',
+      );
+    } else if (status >= 400) {
+      this.log.warn({ traceId, status, detail, path: req?.url }, 'client_error');
     }
 
     res
@@ -59,6 +73,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         status,
         detail,
         instance: req?.url,
+        ...(traceId ? { traceId } : {}),
         ...(errors ? { errors } : {}),
       });
   }

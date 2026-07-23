@@ -53,10 +53,21 @@ export default function InsightDetailScreen() {
     }
   }
 
-  if (loading || !detail) {
+  if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!detail) {
+    return (
+      <View style={styles.center}>
+        <Text style={{ color: colors.textMuted }}>Insight não encontrado.</Text>
+        <Pressable onPress={() => void load()} style={{ marginTop: spacing.md }}>
+          <Text style={{ color: colors.primary }}>Tentar de novo</Text>
+        </Pressable>
       </View>
     );
   }

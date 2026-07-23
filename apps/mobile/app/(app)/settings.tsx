@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,20 +8,37 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/state/auth.store';
 import { deleteAccountAndWipe, exportAndShare } from '../../src/features/privacy/privacy.service';
+import {
+  loadDogfoodSnapshot,
+  type DogfoodSnapshot,
+} from '../../src/features/dogfood/dogfood.service';
 import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
- * Ajustes — export / apagar / sair (docs/19 §13, M7).
+ * Ajustes — export / apagar / dogfooding North Star (docs/19 §13, M7/M8).
  */
 export default function SettingsScreen() {
   const router = useRouter();
   const logout = useAuth((s) => s.logout);
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [dogfood, setDogfood] = useState<DogfoodSnapshot | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadDogfood = useCallback(async () => {
+    setDogfood(await loadDogfoodSnapshot());
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadDogfood();
+    }, [loadDogfood]),
+  );
 
   const onExport = async () => {
     setBusy('export');
@@ -72,10 +89,49 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            void loadDogfood().finally(() => setRefreshing(false));
+          }}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <Text style={styles.lead}>
-        Seus dados são seus. Exporte quando quiser; apague de verdade (servidor + aparelho).
+        Seus dados são seus. Exporte quando quiser; apague de verdade. Acompanhe o dogfooding
+        (North Star = insights úteis / semana).
       </Text>
+
+      <Text style={styles.section}>Dogfooding (M8)</Text>
+      {dogfood ? (
+        <View style={styles.card}>
+          <Text style={styles.statLine}>
+            Streak: {dogfood.streakDays} dia{dogfood.streakDays === 1 ? '' : 's'} · meta D8: 30
+          </Text>
+          <Text style={styles.statLine}>Dias com abertura: {dogfood.openDaysTotal}</Text>
+          {dogfood.stats ? (
+            <>
+              <Text style={styles.statLine}>
+                Úteis esta semana: {dogfood.stats.usefulThisWeek}{' '}
+                {dogfood.stats.northStarMet ? '✓ North Star' : '(meta ≥ 1)'}
+              </Text>
+              <Text style={styles.statMuted}>
+                Úteis total {dogfood.stats.usefulTotal} · ativos {dogfood.stats.activeInsights} ·
+                eventos {dogfood.stats.eventsTotal}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.statMuted}>{dogfood.statsError ?? 'Stats offline'}</Text>
+          )}
+        </View>
+      ) : (
+        <ActivityIndicator color={colors.primary} />
+      )}
 
       <Text style={styles.section}>Portabilidade</Text>
       <Pressable
@@ -140,6 +196,16 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  statLine: { color: colors.text, marginBottom: 4, fontSize: font.size.md },
+  statMuted: { color: colors.textMuted, fontSize: font.size.sm, marginTop: 4 },
   hint: { color: colors.textMuted, fontSize: font.size.sm, marginBottom: spacing.sm },
   input: {
     borderWidth: 1,

@@ -1,7 +1,7 @@
 # 31 — Getting Started (Docs → Código)
 
-> **Fase:** 🟢 MVP · **Marco atual:** **M7** (Privacidade export/delete + Onboarding) · **Leia antes:** [`20_MVP.md`](20_MVP.md) §2.6–2.7 · [`15_Privacy_Architecture.md`](15_Privacy_Architecture.md)
-> **Objetivo:** colocar o Atlas rodando localmente e explicar a estrutura do código.
+> **Fase:** 🟢 MVP · **Marco atual:** **M8** (Endurecimento + dogfooding) · **Leia antes:** [`20_MVP.md`](20_MVP.md) §5 / gate D8
+> **Objetivo:** colocar o Atlas rodando localmente e viver nele.
 
 ---
 
@@ -9,59 +9,68 @@
 
 | Marco | Status |
 |---|---|
-| M0–M6 | ✅ |
-| **M7 Privacidade + Onboarding** | ✅ |
+| M0–M7 | ✅ |
+| **M8 Endurecimento + dogfooding** | ✅ (código) · D8 = 30 dias de uso |
 
-### M7 — o que entrou
+### M8 — o que entrou no código
 
-- ✅ `GET /api/account/export` — JSON do CMHL (eventos, insights, índice de embeddings)
-- ✅ `DELETE /api/account` — hard delete (cascade Prisma: eventos, RMs, insights, embeddings, tokens)
-- ✅ App: **Ajustes** — export (Share JSON), apagar conta (digite `APAGAR`), sair
-- ✅ `resetLocalDb()` — limpa SQLite no device
-- ✅ Onboarding (&lt; 5 min): boas-vindas → Demo Saúde → primeiro insight → Hoje
-- ✅ Gate: autenticado sem `onboarding.completed` → `/(onboarding)`
+- ✅ Logs estruturados (**pino**) + `x-request-id` / `traceId` em erros
+- ✅ Rate limit leve (`@nestjs/throttler`, 120 req/min)
+- ✅ `GET /api/account/stats` — North Star (úteis esta semana)
+- ✅ Health com `version` + `embeddingProvider`
+- ✅ App: streak local de abertura, stats em **Ajustes**, banner de erro de sync, ErrorBoundary
+- ✅ Cliente HTTP mais resiliente (JSON/rede)
+- ⚪ Sentry: env `SENTRY_DSN` reservada (SDK ainda não acoplado — logs bastam no dogfood local)
 
 ---
 
-## 2. Como validar privacidade
+## 2. Checklist de dogfooding (gate D8)
+
+Faça isto **todo dia** por ~30 dias (sem obrigação formal — o teste é *querer* abrir):
+
+1. Abrir o Atlas (conta streak em Ajustes)  
+2. Registrar humor e/ou gasto / nota  
+3. Pull Insights → marcar **útil** o que fizer sentido (North Star ≥ 1/semana)  
+4. Busca semântica (com Gemini ligado) em alguma dúvida real  
+5. Se algo falhar: anotar + corrigir (isso também é M8)
+
+**Meta North Star:** ≥ 1 insight marcado útil por semana.  
+**Meta D8:** streak de abertura ≥ 30 dias (Ajustes → Dogfooding).
+
+---
+
+## 3. Como validar M8 técnico
 
 ```bash
+npm run infra:up
 npm run dev:api
-# Expo: conta → Ajustes
+# Expo: npx expo start
 ```
 
-1. **Exportar** → compartilha JSON com seus eventos/insights  
-2. Digite `APAGAR` → **Apagar conta** → volta ao login; tokens inválidos; Postgres sem o user  
-3. Nova conta → onboarding aparece de novo  
+- Logs da API em JSON (método, path, status, ms, requestId)  
+- `GET /api/health` → `version: 0.8.0-m8`  
+- Ajustes → ver streak + “Úteis esta semana”  
+- Desligar API → Hoje mostra aviso de sync (timeline local segue)
 
 ---
 
-## 3. Como validar onboarding
-
-1. Registrar usuário novo (ou apagar conta e criar outra)  
-2. Boas-vindas → **Começar**  
-3. **Conectar Demo Saúde** → importa ~30 dias  
-4. Ver primeiro insight → **Ir para o Atlas**  
-5. (Quem já dogfooda) pode **Pular** na primeira tela  
-
----
-
-## 4. Busca semântica (M6) — lembrete
+## 4. Gemini (M6) — lembrete
 
 ```env
 EMBEDDING_PROVIDER=gemini
 GEMINI_API_KEY=sua_chave
+LOG_LEVEL=info
 ```
-
-Hoje → Busca → Reindexar se necessário.
 
 ---
 
-## 5. Próximos passos
+## 5. Depois do M8
 
-- **M8 — Endurecimento + dogfooding sério** (observabilidade, correções de uso real)
+O MVP “fecha” com o **uso**, não com mais features. Quando D8 estiver sólido:
+
+- V1: conectores nativos reais, LLM só para redigir (opt-in), polish de produto  
 
 ---
 
 ### Resumo
-O Atlas agora fecha a promessa de confiança: **exportar / apagar de verdade** e **primeiro insight em minutos**.
+M0–M7 entregaram o loop. **M8 endurece e mede.** O teste real é você abrir o Atlas amanhã de manhã.

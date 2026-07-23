@@ -25,6 +25,12 @@ const EnvSchema = z
     EMBEDDINGS_MODEL: z.string().default('gemini-embedding-001'),
     /** Dimensão do vetor (deve bater com migration vector(N)). */
     EMBEDDINGS_DIMENSIONS: z.coerce.number().int().positive().default(768),
+
+    /** Observabilidade M8 — pino. Sentry fica opt-in futuro via DSN. */
+    LOG_LEVEL: z
+      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+      .default('info'),
+    SENTRY_DSN: z.string().optional().default(''),
   })
   .superRefine((env, ctx) => {
     if (env.EMBEDDING_PROVIDER === 'gemini' && !env.GEMINI_API_KEY.trim()) {

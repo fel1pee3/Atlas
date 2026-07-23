@@ -19,6 +19,7 @@ export default function TimelineScreen() {
   const [items, setItems] = useState<LocalEvent[]>([]);
   const [daily, setDaily] = useState<DailySummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const loadLocal = useCallback(async () => {
     setItems(await getLocalTimeline());
@@ -35,8 +36,10 @@ export default function TimelineScreen() {
   const refreshAll = useCallback(async () => {
     try {
       await syncNow();
-    } catch {
-      // Sem rede: timeline local permanece utilizável.
+      setSyncError(null);
+    } catch (err) {
+      // Sem rede: timeline local permanece utilizável — mas avisamos (M8).
+      setSyncError(err instanceof Error ? err.message : 'Sync falhou');
     }
     await loadLocal();
     await loadDaily();
@@ -64,14 +67,19 @@ export default function TimelineScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
         ListHeaderComponent={
-          <TodaySummary
-            daily={daily}
-            onOpenHealth={() => router.push('/(app)/health')}
-            onOpenSources={() => router.push('/(app)/sources')}
-            onOpenInsights={() => router.push('/(app)/insights')}
-            onOpenSearch={() => router.push('/(app)/search')}
-            onOpenSettings={() => router.push('/(app)/settings')}
-          />
+          <>
+            {syncError ? (
+              <Text style={styles.syncWarn}>Sync: {syncError} (timeline local ok)</Text>
+            ) : null}
+            <TodaySummary
+              daily={daily}
+              onOpenHealth={() => router.push('/(app)/health')}
+              onOpenSources={() => router.push('/(app)/sources')}
+              onOpenInsights={() => router.push('/(app)/insights')}
+              onOpenSearch={() => router.push('/(app)/search')}
+              onOpenSettings={() => router.push('/(app)/settings')}
+            />
+          </>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -239,6 +247,12 @@ function summarize(type: string, payload: Record<string, unknown>): string {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   list: { padding: spacing.md, paddingBottom: 100, gap: spacing.sm, flexGrow: 1 },
+  syncWarn: {
+    color: colors.danger,
+    fontSize: font.size.sm,
+    marginBottom: spacing.sm,
+    lineHeight: 18,
+  },
   today: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

@@ -5,10 +5,12 @@ import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../src/state/auth.store';
 import { initLocalDb } from '../src/db/client';
 import { useOnboarding } from '../src/features/onboarding/onboarding.store';
+import { recordAppOpen } from '../src/features/dogfood/dogfood.service';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { colors } from '../src/theme';
 
 /**
- * Layout raiz: DB local, sessão e gate auth + onboarding (docs/08, docs/19, M7).
+ * Layout raiz: DB local, sessão, onboarding gate + dogfood streak (M7/M8).
  */
 export default function RootLayout() {
   const status = useAuth((s) => s.status);
@@ -31,6 +33,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (status === 'authenticated') {
       void refreshOnboarding();
+      void recordAppOpen();
     } else if (status === 'unauthenticated') {
       resetOnboarding();
     }
@@ -68,9 +71,9 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
-    </>
+    </ErrorBoundary>
   );
 }

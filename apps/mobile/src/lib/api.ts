@@ -18,6 +18,7 @@ export interface ProblemDetail {
   title: string;
   status: number;
   detail: string;
+  traceId?: string;
   errors?: unknown;
 }
 
@@ -26,7 +27,8 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly problem: ProblemDetail,
   ) {
-    super(problem.detail || problem.title);
+    const suffix = problem.traceId ? ` [${problem.traceId}]` : '';
+    super((problem.detail || problem.title) + suffix);
   }
 }
 
@@ -42,6 +44,15 @@ export function configureApi(opts: { getAccessToken: TokenProvider; onNeedRefres
   onNeedRefresh = opts.onNeedRefresh;
 }
 
+function parseBody(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return { title: 'Resposta inválida', status: 0, detail: text.slice(0, 200) };
+  }
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -49,14 +60,27 @@ async function request<T>(
   retryOn401 = true,
 ): Promise<T> {
   const token = getAccessToken();
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const headers: Record<string, string> = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    throw new ApiError(0, {
+      title: 'Rede',
+      status: 0,
+      detail: err instanceof Error ? err.message : 'Falha de rede',
+    });
+  }
 
   if (res.status === 401 && retryOn401) {
     const refreshed = await onNeedRefresh();
@@ -64,10 +88,14 @@ async function request<T>(
   }
 
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  const data = parseBody(text);
 
   if (!res.ok) {
-    throw new ApiError(res.status, data as ProblemDetail);
+    const problem =
+      data && typeof data === 'object'
+        ? (data as ProblemDetail)
+        : { title: 'Erro', status: res.status, detail: text.slice(0, 200) };
+    throw new ApiError(res.status, { ...problem, status: res.status });
   }
   return data as T;
 }
@@ -82,6 +110,7 @@ export const api = {
 export const accountApi = {
   export: () => api.get<Record<string, unknown>>('/account/export'),
   delete: () => api.delete<{ deletedAt: string; userId: string }>('/account'),
+  stats: () => api.get('/account/stats'),
 };
 
 export const authApi = {
