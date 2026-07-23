@@ -1,0 +1,48 @@
+{
+  "name": "@atlas/api",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Atlas backend — NestJS modular monolith (Clean Architecture + DDD). Ver docs/09_Backend_Architecture.md",
+  "main": "dist/main.js",
+  "scripts": {
+    "prebuild": "npm run build -w @atlas/shared",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest --passWithNoTests",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "dotenv -e ../../.env -- prisma studio"
+  },
+  "dependencies": {
+    "@atlas/shared": "*",
+    "@nestjs/common": "^11.1.28",
+    "@nestjs/core": "^11.1.28",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/platform-express": "^11.1.28",
+    "@prisma/client": "^6.19.3",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "helmet": "^8.3.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.24",
+    "@nestjs/schematics": "^11.1.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.1",
+    "dotenv-cli": "^8.0.0",
+    "jest": "^30.4.2",
+    "prisma": "^6.19.3",
+    "ts-jest": "^29.4.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

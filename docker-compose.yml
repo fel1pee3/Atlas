@@ -1,0 +1,53 @@
+# =============================================================================
+# Atlas — infraestrutura local de desenvolvimento (MVP 🟢)
+# Ver docs/27_DevOps.md e docs/10_Database_Design.md
+#
+#   docker compose up -d      # sobe Postgres(+pgvector) e Redis
+#   docker compose down       # para (mantém dados)
+#   docker compose down -v    # para e APAGA os volumes (reset total)
+# =============================================================================
+
+services:
+  postgres:
+    # pgvector/pgvector: imagem oficial do Postgres já com a extensão pgvector.
+    # Um único banco cobre relacional + JSONB + vetores + grafo-lite no MVP (ADR-0004).
+    image: pgvector/pgvector:pg16
+    container_name: atlas_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-atlas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-atlas}
+      POSTGRES_DB: ${POSTGRES_DB:-atlas}
+    ports:
+      # Host configurável (evita conflito com outros Postgres locais). Container sempre 5432.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - atlas_pgdata:/var/lib/postgresql/data
+      # Script idempotente que habilita extensões (pgvector, pgcrypto) na criação do volume.
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-atlas} -d ${POSTGRES_DB:-atlas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    # Redis: cache + filas (BullMQ). Efêmero por design — nunca é fonte de verdade.
+    image: redis:7-alpine
+    container_name: atlas_redis
+    restart: unless-stopped
+    ports:
+      # Host 6380 por padrão (a 6379 costuma estar ocupada por outro Redis local).
+      # Container sempre 6379. Ajuste REDIS_PORT no .env se necessário.
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - atlas_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  atlas_pgdata:
+  atlas_redisdata:

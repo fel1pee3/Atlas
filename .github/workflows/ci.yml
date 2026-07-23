@@ -1,0 +1,63 @@
+# =============================================================================
+# Atlas — CI (docs/27_DevOps.md). Valida backend + pacote compartilhado.
+# Mobile (Expo) é validado localmente/EAS por enquanto (ver docs/31_Getting_Started.md).
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  api:
+    name: Build & Test (api + shared)
+    runs-on: ubuntu-latest
+
+    # Postgres real para futuros testes de integração (docs/26_Testing.md).
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: atlas
+          POSTGRES_PASSWORD: atlas
+          POSTGRES_DB: atlas_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U atlas"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgresql://atlas:atlas@localhost:5432/atlas_test?schema=public
+      JWT_ACCESS_SECRET: ci-access-secret-ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build -w @atlas/shared
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate -w @atlas/api
+
+      - name: Typecheck (api)
+        run: npm run typecheck -w @atlas/api
+
+      - name: Unit tests (api)
+        run: npm test -w @atlas/api
+
+      - name: Build (api)
+        run: npm run build -w @atlas/api

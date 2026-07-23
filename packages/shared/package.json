@@ -1,0 +1,19 @@
+{
+  "name": "@atlas/shared",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Kernel compartilhado do Atlas: tipos canônicos de Evento e schemas de validação (Zod).",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

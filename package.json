@@ -1,0 +1,29 @@
+{
+  "name": "atlas",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Atlas — Personal Intelligence Platform (monorepo). Ver docs/ATLAS_MASTER_CONTEXT.md",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "react-native-reanimated": "4.5.2",
+    "react-native-worklets": "0.10.2"
+  },
+  "scripts": {
+    "build:shared": "npm run build -w @atlas/shared",
+    "dev:api": "npm run start:dev -w @atlas/api",
+    "dev:mobile": "npm run start -w @atlas/mobile -- --clear",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:reset": "docker compose down -v",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}

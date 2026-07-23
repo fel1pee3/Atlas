@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Atlas",
+    "slug": "atlas",
+    "version": "0.0.1",
+    "scheme": "atlas",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.atlas.app"
+    },
+    "android": {
+      "package": "com.atlas.app",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "//": "Ajuste apiBaseUrl para o IP da sua máquina na rede local ao rodar em device físico. Ver docs/31_Getting_Started.md",
+      "apiBaseUrl": "http://10.0.2.2:3333/api"
+    }
+  }
+}

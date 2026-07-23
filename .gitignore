@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Builds
+dist/
+build/
+*.tsbuildinfo
+
+# Env & secrets (NUNCA commitar — ver docs/16_Security.md)
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Testes / cobertura
+coverage/
+.nyc_output/
+
+# Prisma
+apps/api/prisma/*.db
+
+# Expo / React Native
+.expo/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/web-build/
+*.jks
+*.p8
+*.p12
+*.mobileprovision
+*.orig.*
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Docker volumes locais
+.docker-data/
