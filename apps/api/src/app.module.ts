@@ -5,10 +5,10 @@ import { IdentityModule } from './modules/identity/identity.module';
 import { EventsModule } from './modules/events/events.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { SearchModule } from './modules/search/search.module';
+import { PrivacyModule } from './modules/privacy/privacy.module';
 
 /**
  * Módulo raiz — compõe os bounded contexts do monólito modular (docs/09 §4).
- * Novos módulos (ingestion, privacy) entram aqui por fase.
  */
 @Module({
   imports: [
@@ -18,6 +18,7 @@ import { SearchModule } from './modules/search/search.module';
     EventsModule,
     InsightsModule,
     SearchModule,
+    PrivacyModule,
   ],
 })
 export class AppModule {}

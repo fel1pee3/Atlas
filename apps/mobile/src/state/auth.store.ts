@@ -18,6 +18,8 @@ interface AuthState {
   register: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Limpa sessão local sem chamar a API (após delete de conta). */
+  logoutLocalOnly: () => Promise<void>;
   refresh: () => Promise<string | null>;
 }
 
@@ -86,6 +88,11 @@ export const useAuth = create<AuthState>((set, get) => ({
         // logout local vale mesmo se a chamada falhar
       }
     }
+    await clearPersisted();
+    set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
+  },
+
+  logoutLocalOnly: async () => {
     await clearPersisted();
     set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
   },

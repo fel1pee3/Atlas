@@ -18,6 +18,7 @@ export default function AppLayout() {
       <Stack.Screen name="insights" options={{ title: 'Insights' }} />
       <Stack.Screen name="insight/[id]" options={{ title: 'Insight' }} />
       <Stack.Screen name="search" options={{ title: 'Busca' }} />
+      <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
     </Stack>
   );
 }

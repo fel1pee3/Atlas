@@ -48,3 +48,11 @@ export function initLocalDb(): void {
     );
   `);
 }
+
+/** Apaga todo o CMHL local (M7 — delete real / logout limpo). */
+export function resetLocalDb(): void {
+  getSqlite().execSync(`
+    DELETE FROM events;
+    DELETE FROM sync_meta;
+  `);
+}

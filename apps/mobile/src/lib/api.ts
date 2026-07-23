@@ -75,7 +75,13 @@ async function request<T>(
 export const api = {
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
   get: <T>(path: string) => request<T>('GET', path),
+  delete: <T>(path: string) => request<T>('DELETE', path),
   raw: request,
+};
+
+export const accountApi = {
+  export: () => api.get<Record<string, unknown>>('/account/export'),
+  delete: () => api.delete<{ deletedAt: string; userId: string }>('/account'),
 };
 
 export const authApi = {

@@ -8,7 +8,6 @@ import {
   type DailySummary,
 } from '../../src/features/sync/sync.service';
 import type { LocalEvent } from '../../src/db/schema';
-import { useAuth } from '../../src/state/auth.store';
 import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
@@ -20,7 +19,6 @@ export default function TimelineScreen() {
   const [items, setItems] = useState<LocalEvent[]>([]);
   const [daily, setDaily] = useState<DailySummary | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const logout = useAuth((s) => s.logout);
 
   const loadLocal = useCallback(async () => {
     setItems(await getLocalTimeline());
@@ -72,6 +70,7 @@ export default function TimelineScreen() {
             onOpenSources={() => router.push('/(app)/sources')}
             onOpenInsights={() => router.push('/(app)/insights')}
             onOpenSearch={() => router.push('/(app)/search')}
+            onOpenSettings={() => router.push('/(app)/settings')}
           />
         }
         ListEmptyComponent={
@@ -86,8 +85,8 @@ export default function TimelineScreen() {
       />
 
       <View style={styles.footer}>
-        <Pressable onPress={logout}>
-          <Text style={styles.logout}>Sair</Text>
+        <Pressable onPress={() => router.push('/(app)/settings')}>
+          <Text style={styles.logout}>Ajustes</Text>
         </Pressable>
         <Pressable
           style={styles.fab}
@@ -114,12 +113,14 @@ function TodaySummary({
   onOpenSources,
   onOpenInsights,
   onOpenSearch,
+  onOpenSettings,
 }: {
   daily: DailySummary | null;
   onOpenHealth: () => void;
   onOpenSources: () => void;
   onOpenInsights: () => void;
   onOpenSearch: () => void;
+  onOpenSettings: () => void;
 }) {
   return (
     <View style={styles.today}>
@@ -137,6 +138,9 @@ function TodaySummary({
           </Pressable>
           <Pressable onPress={onOpenSources}>
             <Text style={styles.healthLink}>Fontes</Text>
+          </Pressable>
+          <Pressable onPress={onOpenSettings}>
+            <Text style={styles.healthLink}>Ajustes</Text>
           </Pressable>
         </View>
       </View>
