@@ -22,8 +22,9 @@ COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
+# npm exec -w @atlas/api usa cwd=apps/api → schema relativo a esse dir.
 RUN npm run build -w @atlas/shared \
- && npm exec -w @atlas/api -- prisma generate --schema apps/api/prisma/schema.prisma \
+ && npm exec -w @atlas/api -- prisma generate --schema prisma/schema.prisma \
  && npm run build -w @atlas/api
 
 # ---- Stage 2: runtime ----
