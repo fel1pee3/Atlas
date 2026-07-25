@@ -17,7 +17,6 @@ export default function RootLayout() {
   const hydrate = useAuth((s) => s.hydrate);
   const onboarded = useOnboarding((s) => s.done);
   const refreshOnboarding = useOnboarding((s) => s.refresh);
-  const resetOnboarding = useOnboarding((s) => s.reset);
   const segments = useSegments();
   const router = useRouter();
 
@@ -34,23 +33,28 @@ export default function RootLayout() {
     if (status === 'authenticated') {
       void refreshOnboarding();
       void recordAppOpen();
-    } else if (status === 'unauthenticated') {
-      resetOnboarding();
     }
-  }, [status, refreshOnboarding, resetOnboarding]);
+    // Logout NÃO zera onboarding (done=null causava stack zumbi + spinner).
+    // Apagar conta: wipe SQLite + useOnboarding.reset().
+  }, [status, refreshOnboarding]);
 
   useEffect(() => {
     if (status === 'loading') return;
-    if (status === 'authenticated' && onboarded === null) return;
+
+    if (status === 'unauthenticated') {
+      const group = segments[0];
+      if (group === '(app)' || group === '(onboarding)') {
+        router.replace('/');
+      }
+      return;
+    }
+
+    // authenticated
+    if (onboarded === null) return;
 
     const group = segments[0];
     const inApp = group === '(app)';
     const inOnboarding = group === '(onboarding)';
-
-    if (status === 'unauthenticated') {
-      if (inApp || inOnboarding) router.replace('/');
-      return;
-    }
 
     if (!onboarded) {
       if (!inOnboarding) router.replace('/(onboarding)');
@@ -73,7 +77,11 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      {/* key remonta a árvore no login/logout — evita tela (app) “zumbi” após Sair. */}
+      <Stack
+        key={status}
+        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+      />
     </ErrorBoundary>
   );
 }

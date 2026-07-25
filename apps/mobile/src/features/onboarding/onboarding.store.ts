@@ -28,7 +28,9 @@ export const useOnboarding = create<OnboardingState>((set) => ({
   },
 
   reset: () => {
+    // false = "não feito" (após apagar conta). null = "ainda carregando" — nunca usar no logout
+    // senão o gate autentica + done=null e a UI fica em spinner/stack zumbi.
     clearOnboardingCache();
-    set({ done: null });
+    set({ done: false });
   },
 }));

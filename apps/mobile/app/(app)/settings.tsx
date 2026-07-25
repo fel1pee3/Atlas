@@ -172,11 +172,8 @@ export default function SettingsScreen() {
       <Pressable
         style={styles.btn}
         onPress={() => {
-          // Sair sempre disponível (antes ficava disabled durante export eterno).
-          void (async () => {
-            await logout();
-            router.replace('/');
-          })();
+          // Só logout — o _layout remonta o Stack e manda pro login (evitar replace duplo).
+          void logout();
         }}
         disabled={busy === 'delete'}
       >
