@@ -27,9 +27,11 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 
-  // Railway/Fly injetam PORT; localmente usamos API_PORT (default 3333).
+  // Railway: healthcheck/proxy usam a var PORT; com target port customizado
+  // (ex.: 3333) defina também PORT=3333 nas Variables — senão fica "unavailable".
+  // Bind em '::' (dual-stack): edge do Railway fala IPv6; '0.0.0.0' só IPv4.
   const port = Number(process.env.PORT ?? env.API_PORT);
-  await app.listen(port, '0.0.0.0');
+  await app.listen(port, '::');
   getPino().info({ port }, 'Atlas API listening');
 }
 
