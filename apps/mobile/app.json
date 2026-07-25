@@ -19,7 +19,8 @@
       "expo-router",
       "expo-secure-store",
       "expo-sqlite",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sharing"
     ],
     "extra": {
       "//": "Produção: Railway. Para API local no emulador Android use http://10.0.2.2:3333/api — docs/31_Getting_Started.md",

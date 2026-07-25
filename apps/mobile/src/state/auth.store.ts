@@ -81,15 +81,12 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     const { refreshToken } = get();
-    if (refreshToken) {
-      try {
-        await authApi.logout(refreshToken);
-      } catch {
-        // logout local vale mesmo se a chamada falhar
-      }
-    }
+    // Limpa sessão local na hora — não esperar a API (no celular parecia que "Sair" não fazia nada).
     await clearPersisted();
     set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
+    if (refreshToken) {
+      void authApi.logout(refreshToken).catch(() => undefined);
+    }
   },
 
   logoutLocalOnly: async () => {

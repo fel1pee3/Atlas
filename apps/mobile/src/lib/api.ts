@@ -152,7 +152,8 @@ export const api = {
 };
 
 export const accountApi = {
-  export: () => api.get<Record<string, unknown>>('/account/export'),
+  export: () =>
+    api.get<Record<string, unknown>>('/account/export', { timeoutMs: api.timeouts.long }),
   delete: () => api.delete<{ deletedAt: string; userId: string }>('/account'),
   stats: () => api.get('/account/stats'),
 };

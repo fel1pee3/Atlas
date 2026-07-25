@@ -137,7 +137,7 @@ export default function SettingsScreen() {
       <Pressable
         style={[styles.btn, styles.btnPrimary]}
         onPress={() => void onExport()}
-        disabled={busy !== null}
+        disabled={busy === 'export' || busy === 'delete'}
       >
         {busy === 'export' ? (
           <ActivityIndicator color={colors.primaryText} />
@@ -159,7 +159,7 @@ export default function SettingsScreen() {
       <Pressable
         style={[styles.btn, styles.btnDanger]}
         onPress={onDelete}
-        disabled={busy !== null}
+        disabled={busy === 'export' || busy === 'delete'}
       >
         {busy === 'delete' ? (
           <ActivityIndicator color={colors.primaryText} />
@@ -172,9 +172,13 @@ export default function SettingsScreen() {
       <Pressable
         style={styles.btn}
         onPress={() => {
-          void logout().then(() => router.replace('/'));
+          // Sair sempre disponível (antes ficava disabled durante export eterno).
+          void (async () => {
+            await logout();
+            router.replace('/');
+          })();
         }}
-        disabled={busy !== null}
+        disabled={busy === 'delete'}
       >
         <Text style={styles.btnText}>Sair</Text>
       </Pressable>

@@ -1,5 +1,11 @@
-import { Share } from 'react-native';
-import { accountApi } from '../../lib/api';
+import { shareAsync, isAvailableAsync } from 'expo-sharing';
+import {
+  cacheDirectory,
+  documentDirectory,
+  writeAsStringAsync,
+  EncodingType,
+} from 'expo-file-system/legacy';
+import { accountApi, api } from '../../lib/api';
 import { getDb, resetLocalDb } from '../../db/client';
 import { events } from '../../db/schema';
 import { useAuth } from '../../state/auth.store';
@@ -10,7 +16,12 @@ import { useOnboarding } from '../onboarding/onboarding.store';
  */
 
 export async function exportAndShare(): Promise<{ counts: Record<string, number> }> {
-  const server = await accountApi.export();
+  // Export pode ser grande (Demo 30 dias) — timeout longo; compartilhar como ARQUIVO
+  // (Share.message com JSON enorme trava o Android e o spinner nunca para).
+  const server = await api.get<Record<string, unknown>>('/account/export', {
+    timeoutMs: api.timeouts.long,
+  });
+
   const localRows = await getDb().select().from(events);
 
   const bundle = {
@@ -28,10 +39,24 @@ export async function exportAndShare(): Promise<{ counts: Record<string, number>
   };
 
   const json = JSON.stringify(bundle, null, 2);
-  await Share.share({
-    title: 'Atlas — export CMHL',
-    message: json,
-  });
+  const baseDir = cacheDirectory ?? documentDirectory;
+  if (!baseDir) {
+    throw new Error('Sem diretório local para gravar o export');
+  }
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fileUri = `${baseDir}atlas-export-${stamp}.json`;
+  await writeAsStringAsync(fileUri, json, { encoding: EncodingType.UTF8 });
+
+  if (await isAvailableAsync()) {
+    await shareAsync(fileUri, {
+      mimeType: 'application/json',
+      dialogTitle: 'Atlas — export CMHL',
+      UTI: 'public.json',
+    });
+  } else {
+    throw new Error('Compartilhamento não disponível neste aparelho');
+  }
 
   const counts = (server.counts as Record<string, number>) ?? {};
   return { counts };
