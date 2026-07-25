@@ -7,8 +7,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { Redirect } from 'expo-router';
 import { useAuth } from '../src/state/auth.store';
+import { useOnboarding } from '../src/features/onboarding/onboarding.store';
 import { colors, spacing, radius, font } from '../src/theme';
 
 /**
@@ -21,9 +24,23 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const status = useAuth((s) => s.status);
   const login = useAuth((s) => s.login);
   const register = useAuth((s) => s.register);
   const error = useAuth((s) => s.error);
+  const onboarded = useOnboarding((s) => s.done);
+
+  if (status === 'loading' || (status === 'authenticated' && onboarded === null)) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (status === 'authenticated') {
+    return <Redirect href={onboarded ? '/(app)' : '/(onboarding)'} />;
+  }
 
   async function submit() {
     setBusy(true);

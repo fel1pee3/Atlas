@@ -25,6 +25,7 @@ import { colors, spacing, radius, font } from '../../src/theme';
 export default function SettingsScreen() {
   const router = useRouter();
   const logout = useAuth((s) => s.logout);
+  const [loggingOut, setLoggingOut] = useState(false);
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [dogfood, setDogfood] = useState<DogfoodSnapshot | null>(null);
@@ -172,12 +173,18 @@ export default function SettingsScreen() {
       <Pressable
         style={styles.btn}
         onPress={() => {
-          // Só logout — o _layout remonta o Stack e manda pro login (evitar replace duplo).
-          void logout();
+          if (loggingOut) return;
+          setLoggingOut(true);
+          // status → unauthenticated; (app)/_layout faz <Redirect href="/" /> na hora.
+          void logout().finally(() => setLoggingOut(false));
         }}
-        disabled={busy === 'delete'}
+        disabled={busy === 'delete' || loggingOut}
       >
-        <Text style={styles.btnText}>Sair</Text>
+        {loggingOut ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Text style={styles.btnText}>Sair</Text>
+        )}
       </Pressable>
     </ScrollView>
   );

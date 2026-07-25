@@ -10,7 +10,8 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { colors } from '../src/theme';
 
 /**
- * Layout raiz: DB local, sessão, onboarding gate + dogfood streak (M7/M8).
+ * Layout raiz: DB local, sessão, onboarding gate.
+ * Proteção de rota autenticada fica em (app)/_layout e (onboarding)/_layout via <Redirect>.
  */
 export default function RootLayout() {
   const status = useAuth((s) => s.status);
@@ -34,22 +35,12 @@ export default function RootLayout() {
       void refreshOnboarding();
       void recordAppOpen();
     }
-    // Logout NÃO zera onboarding (done=null causava stack zumbi + spinner).
-    // Apagar conta: wipe SQLite + useOnboarding.reset().
   }, [status, refreshOnboarding]);
 
+  // Só redireciona usuário JÁ autenticado (login → app/onboarding).
+  // Logout é tratado pelo <Redirect> dentro de (app)/(onboarding).
   useEffect(() => {
-    if (status === 'loading') return;
-
-    if (status === 'unauthenticated') {
-      const group = segments[0];
-      if (group === '(app)' || group === '(onboarding)') {
-        router.replace('/');
-      }
-      return;
-    }
-
-    // authenticated
+    if (status !== 'authenticated') return;
     if (onboarded === null) return;
 
     const group = segments[0];
@@ -77,11 +68,7 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <StatusBar style="light" />
-      {/* key remonta a árvore no login/logout — evita tela (app) “zumbi” após Sair. */}
-      <Stack
-        key={status}
-        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
-      />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
     </ErrorBoundary>
   );
 }
