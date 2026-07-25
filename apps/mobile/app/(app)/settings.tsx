@@ -74,7 +74,7 @@ export default function SettingsScreen() {
               setBusy('delete');
               try {
                 await deleteAccountAndWipe();
-                router.replace('/');
+                router.replace('/login');
               } catch (err) {
                 Alert.alert(
                   'Falha ao apagar',
@@ -175,8 +175,11 @@ export default function SettingsScreen() {
         onPress={() => {
           if (loggingOut) return;
           setLoggingOut(true);
-          // 1) limpa tokens  2) root _layout faz replace('/') → tela de login
-          void logout();
+          void (async () => {
+            await logout();
+            // Rota explícita /login (não "/": no Expo Router "/" é a timeline).
+            router.replace('/login');
+          })();
         }}
         disabled={busy === 'delete' || loggingOut}
       >

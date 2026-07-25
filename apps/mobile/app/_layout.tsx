@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
@@ -10,8 +10,14 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { colors } from '../src/theme';
 
 /**
- * Layout raiz: um único lugar decide navegação por sessão.
- * Sem <Redirect> nos filhos (causava Maximum update depth exceeded).
+ * Rotas:
+ * - /login              → autenticação (explícita)
+ * - /(app)/*            → app logado (timeline em / via (app)/index)
+ * - /(onboarding)/*     → onboarding
+ *
+ * Importante: NÃO usar "/" como tela de login. No Expo Router o grupo
+ * `(app)/index` também resolve para "/", então logout com replace('/')
+ * abria a timeline ("Hoje") em vez do login.
  */
 export default function RootLayout() {
   const status = useAuth((s) => s.status);
@@ -20,8 +26,6 @@ export default function RootLayout() {
   const refreshOnboarding = useOnboarding((s) => s.refresh);
   const segments = useSegments();
   const router = useRouter();
-  const lastNav = useRef<string>('');
-  const prevStatus = useRef(status);
 
   useEffect(() => {
     try {
@@ -43,27 +47,26 @@ export default function RootLayout() {
     if (status === 'loading') return;
     if (status === 'authenticated' && onboarded === null) return;
 
-    if (prevStatus.current !== status) {
-      lastNav.current = '';
-      prevStatus.current = status;
-    }
-
-    const group = segments[0] ?? '';
-    let target: string | null = null;
+    const root = segments[0];
+    const onLogin = root === 'login';
+    const inApp = root === '(app)';
+    const inOnboarding = root === '(onboarding)';
 
     if (status === 'unauthenticated') {
-      if (group === '(app)' || group === '(onboarding)') {
-        target = '/';
+      if (!onLogin) {
+        router.replace('/login');
       }
-    } else if (!onboarded) {
-      if (group !== '(onboarding)') target = '/(onboarding)';
-    } else if (group !== '(app)') {
-      target = '/(app)';
+      return;
     }
 
-    if (target && lastNav.current !== target) {
-      lastNav.current = target;
-      router.replace(target as '/');
+    // authenticated
+    if (!onboarded) {
+      if (!inOnboarding) router.replace('/(onboarding)');
+      return;
+    }
+
+    if (onLogin || inOnboarding || !inApp) {
+      router.replace('/(app)');
     }
   }, [status, onboarded, segments, router]);
 

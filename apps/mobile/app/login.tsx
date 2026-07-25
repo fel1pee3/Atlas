@@ -13,10 +13,11 @@ import { useAuth } from '../src/state/auth.store';
 import { colors, spacing, radius, font } from '../src/theme';
 
 /**
- * Tela de entrada (login/registro).
- * Navegação pós-login é só no root _layout (sem Redirect aqui).
+ * Login/registro em /login (rota explícita).
+ * NÃO usar app/index.tsx para auth: no Expo Router o grupo (app)/index
+ * também resolve para "/", e o logout com replace('/') abria a timeline.
  */
-export default function AuthScreen() {
+export default function LoginScreen() {
   const [mode, setMode] = useState<'login' | 'register'>('register');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,16 +40,7 @@ export default function AuthScreen() {
     }
   }
 
-  if (status === 'loading') {
-    return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
-  // Se já autenticou, o root _layout redireciona — mostra loading leve.
-  if (status === 'authenticated') {
+  if (status === 'loading' || status === 'authenticated') {
     return (
       <View style={[styles.container, { justifyContent: 'center' }]}>
         <ActivityIndicator color={colors.primary} />

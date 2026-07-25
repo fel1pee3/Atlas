@@ -1,8 +1,23 @@
 import { Stack } from 'expo-router';
+import { View, ActivityIndicator } from 'react-native';
+import { useAuth } from '../../src/state/auth.store';
 import { colors } from '../../src/theme';
 
-/** Stack autenticada (docs/19_UI_Screens.md). Gate de auth fica no root _layout. */
+/**
+ * Stack do app logado. Se a sessão caiu, não renderiza as telas
+ * (evita “flash” da timeline enquanto o root manda para /login).
+ */
 export default function AppLayout() {
+  const status = useAuth((s) => s.status);
+
+  if (status !== 'authenticated') {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <Stack
       screenOptions={{
