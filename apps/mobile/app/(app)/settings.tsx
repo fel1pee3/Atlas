@@ -175,8 +175,8 @@ export default function SettingsScreen() {
         onPress={() => {
           if (loggingOut) return;
           setLoggingOut(true);
-          // status → unauthenticated; (app)/_layout faz <Redirect href="/" /> na hora.
-          void logout().finally(() => setLoggingOut(false));
+          // 1) limpa tokens  2) root _layout faz replace('/') → tela de login
+          void logout();
         }}
         disabled={busy === 'delete' || loggingOut}
       >

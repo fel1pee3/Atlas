@@ -9,14 +9,12 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { Redirect } from 'expo-router';
 import { useAuth } from '../src/state/auth.store';
-import { useOnboarding } from '../src/features/onboarding/onboarding.store';
 import { colors, spacing, radius, font } from '../src/theme';
 
 /**
- * Tela de entrada (login/registro). Comunica a promessa de privacidade
- * antes de pedir dados (docs/06_User_Journey.md, docs/19_UI_Screens.md).
+ * Tela de entrada (login/registro).
+ * Navegação pós-login é só no root _layout (sem Redirect aqui).
  */
 export default function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'register'>('register');
@@ -28,19 +26,6 @@ export default function AuthScreen() {
   const login = useAuth((s) => s.login);
   const register = useAuth((s) => s.register);
   const error = useAuth((s) => s.error);
-  const onboarded = useOnboarding((s) => s.done);
-
-  if (status === 'loading' || (status === 'authenticated' && onboarded === null)) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (status === 'authenticated') {
-    return <Redirect href={onboarded ? '/(app)' : '/(onboarding)'} />;
-  }
 
   async function submit() {
     setBusy(true);
@@ -52,6 +37,23 @@ export default function AuthScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (status === 'loading') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Se já autenticou, o root _layout redireciona — mostra loading leve.
+  if (status === 'authenticated') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center' }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
   }
 
   return (
@@ -87,7 +89,7 @@ export default function AuthScreen() {
 
         <Pressable
           style={[styles.button, busy && styles.buttonDisabled]}
-          onPress={submit}
+          onPress={() => void submit()}
           disabled={busy}
         >
           <Text style={styles.buttonText}>

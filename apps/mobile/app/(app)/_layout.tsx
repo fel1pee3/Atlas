@@ -1,27 +1,8 @@
-import { Redirect, Stack } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
-import { useAuth } from '../../src/state/auth.store';
+import { Stack } from 'expo-router';
 import { colors } from '../../src/theme';
 
-/**
- * Stack autenticada. Redirect síncrono no render — ao Sair, status muda e
- * esta tela some na hora (sem useEffect / stack zumbi).
- */
+/** Stack autenticada (docs/19_UI_Screens.md). Gate de auth fica no root _layout. */
 export default function AppLayout() {
-  const status = useAuth((s) => s.status);
-
-  if (status === 'loading') {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (status !== 'authenticated') {
-    return <Redirect href="/" />;
-  }
-
   return (
     <Stack
       screenOptions={{
