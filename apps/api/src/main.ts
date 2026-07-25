@@ -27,8 +27,10 @@ async function bootstrap(): Promise<void> {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableShutdownHooks();
 
-  await app.listen(env.API_PORT, '0.0.0.0');
-  getPino().info({ port: env.API_PORT }, 'Atlas API listening');
+  // Railway/Fly injetam PORT; localmente usamos API_PORT (default 3333).
+  const port = Number(process.env.PORT ?? env.API_PORT);
+  await app.listen(port, '0.0.0.0');
+  getPino().info({ port }, 'Atlas API listening');
 }
 
 void bootstrap();
