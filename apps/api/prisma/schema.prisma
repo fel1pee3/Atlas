@@ -5,8 +5,10 @@
 
 generator client {
   provider      = "prisma-client-js"
-  // native = host do generate (Alpine no Docker); debian p/ debug local se precisar.
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  /// Path fixo (não depende de hoist do monorepo). Importar de `src/generated/prisma`.
+  output          = "../src/generated/prisma"
+  // native = host do generate; musl = Alpine (Railway/Docker).
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

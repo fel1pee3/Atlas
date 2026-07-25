@@ -26,6 +26,7 @@ coverage/
 
 # Prisma
 apps/api/prisma/*.db
+apps/api/src/generated/
 
 # Expo / React Native
 .expo/
