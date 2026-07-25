@@ -23,9 +23,28 @@ COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
 # npm exec -w @atlas/api usa cwd=apps/api → schema relativo a esse dir.
+# Em workspaces o client pode cair em node_modules da raiz OU de apps/api.
 RUN npm run build -w @atlas/shared \
  && npm exec -w @atlas/api -- prisma generate --schema prisma/schema.prisma \
- && npm run build -w @atlas/api
+ && npm run build -w @atlas/api \
+ && mkdir -p /repo/.prisma-out \
+ && if [ -d /repo/node_modules/.prisma ]; then \
+      cp -a /repo/node_modules/.prisma /repo/.prisma-out/.prisma; \
+    elif [ -d /repo/apps/api/node_modules/.prisma ]; then \
+      cp -a /repo/apps/api/node_modules/.prisma /repo/.prisma-out/.prisma; \
+    else \
+      echo "ERROR: .prisma not found after generate" >&2; \
+      find /repo -type d -name '.prisma' 2>/dev/null || true; \
+      exit 1; \
+    fi \
+ && if [ -d /repo/node_modules/@prisma ]; then \
+      cp -a /repo/node_modules/@prisma /repo/.prisma-out/@prisma; \
+    elif [ -d /repo/apps/api/node_modules/@prisma ]; then \
+      cp -a /repo/apps/api/node_modules/@prisma /repo/.prisma-out/@prisma; \
+    else \
+      echo "ERROR: @prisma not found after generate" >&2; \
+      exit 1; \
+    fi
 
 # ---- Stage 2: runtime ----
 FROM node:22-alpine AS runtime
@@ -40,7 +59,9 @@ RUN npm ci --omit=dev
 COPY --from=builder /repo/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /repo/apps/api/dist ./apps/api/dist
 COPY --from=builder /repo/apps/api/prisma ./apps/api/prisma
-COPY --from=builder /repo/node_modules/.prisma ./node_modules/.prisma
+# Client gerado no builder (caminho pode variar no monorepo — consolidado acima).
+COPY --from=builder /repo/.prisma-out/.prisma ./node_modules/.prisma
+COPY --from=builder /repo/.prisma-out/@prisma ./node_modules/@prisma
 
 EXPOSE 3333
 CMD ["node", "apps/api/dist/main.js"]
