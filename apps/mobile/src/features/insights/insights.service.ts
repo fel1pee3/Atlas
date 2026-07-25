@@ -28,11 +28,14 @@ export interface InsightDetail extends InsightListItem {
 }
 
 export async function generateInsights(): Promise<{ generated: number; items: InsightListItem[] }> {
-  return api.post('/insights/generate');
+  // Generate pode passar de 20s com muitos eventos — timeout curto virava "fetch canceled".
+  return api.post('/insights/generate', undefined, { timeoutMs: api.timeouts.long });
 }
 
 export async function listInsights(): Promise<InsightListItem[]> {
-  const res = await api.get<{ items: InsightListItem[] }>('/insights');
+  const res = await api.get<{ items: InsightListItem[] }>('/insights', {
+    timeoutMs: api.timeouts.default,
+  });
   return res.items;
 }
 

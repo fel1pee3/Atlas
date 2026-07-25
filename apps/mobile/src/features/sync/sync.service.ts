@@ -141,45 +141,69 @@ export async function pullRemote(): Promise<number> {
   return inserted;
 }
 
-/** Ciclo completo: conectores → push → pull remoto (docs/08 §7–§8). */
-export async function syncNow(): Promise<{
+type SyncResult = {
   pushed: number;
   pulled: number;
   healthImported: number;
   locationImported: number;
   calendarImported: number;
-}> {
-  let healthImported = 0;
-  let locationImported = 0;
-  let calendarImported = 0;
-  try {
-    if (await isHealthEnabled()) {
-      healthImported = (await syncHealthNow()).imported;
+};
+
+/** Evita syncs concorrentes (foco + pull-to-refresh) cancelando uns aos outros no RN. */
+let syncInFlight: Promise<SyncResult> | null = null;
+
+/** Ciclo completo: conectores → push → pull remoto (docs/08 §7–§8). */
+export async function syncNow(): Promise<SyncResult> {
+  if (syncInFlight) return syncInFlight;
+
+  syncInFlight = (async (): Promise<SyncResult> => {
+    let healthImported = 0;
+    let locationImported = 0;
+    let calendarImported = 0;
+    try {
+      if (await isHealthEnabled()) {
+        healthImported = (await syncHealthNow()).imported;
+      }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (await isLocationEnabled()) {
-      locationImported = (await syncLocationNow()).imported;
+    try {
+      if (await isLocationEnabled()) {
+        locationImported = (await syncLocationNow()).imported;
+      }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (await isCalendarEnabled()) {
-      calendarImported = (await syncCalendarNow()).imported;
+    try {
+      if (await isCalendarEnabled()) {
+        calendarImported = (await syncCalendarNow()).imported;
+      }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
-  }
-  const pushed = await pushPending();
-  const pulled = await pullRemote();
-  return { pushed, pulled, healthImported, locationImported, calendarImported };
+    // Push/pull isolados: falha de um não impede o outro nem o resumo do dia na UI.
+    let pushed = 0;
+    let pulled = 0;
+    try {
+      pushed = await pushPending();
+    } catch {
+      /* pending fica para o próximo ciclo */
+    }
+    try {
+      pulled = await pullRemote();
+    } catch {
+      /* offline / timeout */
+    }
+    return { pushed, pulled, healthImported, locationImported, calendarImported };
+  })().finally(() => {
+    syncInFlight = null;
+  });
+
+  return syncInFlight;
 }
 
 /** Resumo diário do servidor (read models — docs/11 §5.1). */
 export async function fetchDailySummary(day?: string): Promise<DailySummary> {
   const qs = day ? `?day=${encodeURIComponent(day)}` : '';
-  return api.get<DailySummary>(`/events/daily${qs}`);
+  return api.get<DailySummary>(`/events/daily${qs}`, { timeoutMs: api.timeouts.default });
 }

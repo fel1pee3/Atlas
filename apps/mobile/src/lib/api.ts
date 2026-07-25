@@ -2,15 +2,16 @@ import Constants from 'expo-constants';
 
 /**
  * Cliente HTTP do Atlas (docs/17_API_Design.md).
- * - Base URL vem de app.json → extra.apiBaseUrl (ajuste p/ IP local em device físico).
- * - Injeta o access token e trata refresh transparente em 401.
- * - Timeout padrão evita spinner eterno em rede lenta (Railway + celular).
+ * - Base URL vem de app.json → extra.apiBaseUrl.
+ * - Injeta access token e refresh em 401.
+ * - Timeout evita spinner eterno; abort do RN vira mensagem clara (não "fetch canceled").
  */
 const BASE_URL: string =
   (Constants.expoConfig?.extra?.apiBaseUrl as string) ?? 'http://localhost:3333/api';
 
-const DEFAULT_TIMEOUT_MS = 20_000;
+const DEFAULT_TIMEOUT_MS = 25_000;
 const BATCH_TIMEOUT_MS = 60_000;
+const LONG_TIMEOUT_MS = 60_000;
 
 export interface AuthTokens {
   accessToken: string;
@@ -62,6 +63,19 @@ function parseBody(text: string): unknown {
   }
 }
 
+/** React Native costuma emitir "Fetch request has been canceled" em vez de AbortError. */
+export function isAbortLikeError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.name === 'AbortError') return true;
+  const m = err.message.toLowerCase();
+  return (
+    m.includes('abort') ||
+    m.includes('cancel') ||
+    m.includes('timeout após') ||
+    m.includes('rede lenta')
+  );
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -90,15 +104,17 @@ async function request<T>(
       signal: controller.signal,
     });
   } catch (err) {
-    const aborted = err instanceof Error && err.name === 'AbortError';
+    if (isAbortLikeError(err)) {
+      throw new ApiError(0, {
+        title: 'Rede',
+        status: 0,
+        detail: `Timeout após ${timeoutMs}ms`,
+      });
+    }
     throw new ApiError(0, {
       title: 'Rede',
       status: 0,
-      detail: aborted
-        ? `Timeout após ${timeoutMs}ms`
-        : err instanceof Error
-          ? err.message
-          : 'Falha de rede',
+      detail: err instanceof Error ? err.message : 'Falha de rede',
     });
   } finally {
     clearTimeout(timer);
@@ -128,7 +144,11 @@ export const api = {
   get: <T>(path: string, opts?: RequestOptions) => request<T>('GET', path, undefined, opts),
   delete: <T>(path: string, opts?: RequestOptions) => request<T>('DELETE', path, undefined, opts),
   raw: request,
-  timeouts: { default: DEFAULT_TIMEOUT_MS, batch: BATCH_TIMEOUT_MS },
+  timeouts: {
+    default: DEFAULT_TIMEOUT_MS,
+    batch: BATCH_TIMEOUT_MS,
+    long: LONG_TIMEOUT_MS,
+  },
 };
 
 export const accountApi = {

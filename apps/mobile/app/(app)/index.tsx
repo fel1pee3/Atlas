@@ -8,6 +8,7 @@ import {
   type DailySummary,
 } from '../../src/features/sync/sync.service';
 import type { LocalEvent } from '../../src/db/schema';
+import { isAbortLikeError } from '../../src/lib/api';
 import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
@@ -18,6 +19,7 @@ export default function TimelineScreen() {
   const router = useRouter();
   const [items, setItems] = useState<LocalEvent[]>([]);
   const [daily, setDaily] = useState<DailySummary | null>(null);
+  const [dailyOk, setDailyOk] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -28,21 +30,28 @@ export default function TimelineScreen() {
   const loadDaily = useCallback(async () => {
     try {
       setDaily(await fetchDailySummary());
+      setDailyOk(true);
     } catch {
-      // Offline: mantém o último resumo conhecido (ou null).
+      // Mantém último resumo; dailyOk fica false só se nunca carregou.
     }
   }, []);
 
   const refreshAll = useCallback(async () => {
-    // Sempre mostra SQLite primeiro — no celular o sync com Railway podia travar a UI.
     await loadLocal();
+    // Resumo do dia NÃO depende do sync pesado terminar (bug: sync falhava → card vazio).
+    await loadDaily();
     try {
       await syncNow();
       setSyncError(null);
       await loadLocal();
       await loadDaily();
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : 'Sync falhou');
+      if (isAbortLikeError(err)) {
+        setSyncError('Rede lenta — timeline local ok; puxe para tentar de novo');
+      } else {
+        setSyncError(err instanceof Error ? err.message : 'Sync falhou');
+      }
+      await loadDaily();
     }
   }, [loadLocal, loadDaily]);
 
@@ -74,6 +83,7 @@ export default function TimelineScreen() {
             ) : null}
             <TodaySummary
               daily={daily}
+              dailyOk={dailyOk}
               onOpenHealth={() => router.push('/(app)/health')}
               onOpenSources={() => router.push('/(app)/sources')}
               onOpenInsights={() => router.push('/(app)/insights')}
@@ -118,6 +128,7 @@ function formatSleep(min: number): string {
 
 function TodaySummary({
   daily,
+  dailyOk,
   onOpenHealth,
   onOpenSources,
   onOpenInsights,
@@ -125,6 +136,7 @@ function TodaySummary({
   onOpenSettings,
 }: {
   daily: DailySummary | null;
+  dailyOk: boolean;
   onOpenHealth: () => void;
   onOpenSources: () => void;
   onOpenInsights: () => void;
@@ -153,8 +165,10 @@ function TodaySummary({
           </Pressable>
         </View>
       </View>
-      {!daily ? (
-        <Text style={styles.todayMuted}>Sincronize para ver o resumo do dia.</Text>
+      {!dailyOk || !daily ? (
+        <Text style={styles.todayMuted}>
+          Não foi possível carregar o resumo. Puxe para atualizar.
+        </Text>
       ) : (
         <>
           <Text style={styles.todayLine}>

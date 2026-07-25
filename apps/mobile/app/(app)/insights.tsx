@@ -15,6 +15,7 @@ import {
   type InsightListItem,
 } from '../../src/features/insights/insights.service';
 import { isCrossDomainKind } from '@atlas/shared';
+import { isAbortLikeError } from '../../src/lib/api';
 import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
@@ -30,11 +31,30 @@ export default function InsightsScreen() {
   const load = useCallback(async (regen: boolean) => {
     setError(null);
     try {
-      if (regen) await generateInsights();
+      // Lista primeiro (rápido); generate depois — se generate timeout, ainda vemos o que já existe.
       setItems(await listInsights());
+      setLoading(false);
+      if (regen) {
+        try {
+          const gen = await generateInsights();
+          if (gen.items?.length) setItems(gen.items);
+          else setItems(await listInsights());
+        } catch (err) {
+          if (isAbortLikeError(err)) {
+            setError('Geração demorou (rede). Lista atual mantida — puxe para tentar de novo.');
+          } else {
+            setError(err instanceof Error ? err.message : 'Falha ao gerar insights');
+          }
+        }
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao carregar insights');
-    } finally {
+      setError(
+        isAbortLikeError(err)
+          ? 'Rede lenta ao carregar insights. Puxe para tentar de novo.'
+          : err instanceof Error
+            ? err.message
+            : 'Falha ao carregar insights',
+      );
       setLoading(false);
     }
   }, []);
