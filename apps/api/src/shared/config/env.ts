@@ -10,6 +10,8 @@ const EnvSchema = z
     API_PORT: z.coerce.number().int().positive().default(3333),
 
     DATABASE_URL: z.string().url(),
+    /** Migrations / Prisma (Supabase session pooler ou mesmo valor que DATABASE_URL no Docker local). */
+    DIRECT_URL: z.string().url().optional(),
 
     REDIS_HOST: z.string().default('localhost'),
     REDIS_PORT: z.coerce.number().int().positive().default(6379),

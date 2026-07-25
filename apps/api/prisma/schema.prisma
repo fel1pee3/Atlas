@@ -8,8 +8,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  /// Pooler (Supabase transaction mode :6543) ou Postgres local.
+  url       = env("DATABASE_URL")
+  /// Sessão direta / session pooler — obrigatório p/ `prisma migrate` no Supabase.
+  directUrl = env("DIRECT_URL")
 }
 
 /// Usuário = tenant lógico. Todo dado é escopado por userId (docs/09 §9).
