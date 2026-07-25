@@ -103,6 +103,7 @@ export async function syncHealthNow(
   await setMeta(META_CURSOR, nextCursor);
   await setMeta(META_CONNECTOR, connector.id);
 
-  const pushed = await pushPendingBatch();
-  return { imported, pushed };
+  // Push em background — conectar Demo não deve travar a UI esperando a API.
+  void pushPendingBatch().catch(() => undefined);
+  return { imported, pushed: 0 };
 }

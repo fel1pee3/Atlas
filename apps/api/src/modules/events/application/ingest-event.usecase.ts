@@ -48,12 +48,15 @@ export class IngestEventUseCase {
         occurredAt: result.event.occurredAt,
         payload: result.event.payload,
       });
-      await this.indexer.indexEventSafe(
-        result.event.userId,
-        result.event.id,
-        result.event.type,
-        result.event.payload,
-      );
+      // Embeddings (Gemini) em background — não bloquear HTTP/batch (celular abortava ~2min → 499).
+      void this.indexer
+        .indexEventSafe(
+          result.event.userId,
+          result.event.id,
+          result.event.type,
+          result.event.payload,
+        )
+        .catch(() => undefined);
     }
 
     return result;

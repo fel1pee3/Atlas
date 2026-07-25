@@ -23,11 +23,8 @@ export default function OnboardingConnect() {
         return;
       }
       const { imported } = await syncHealthNow(connector);
-      try {
-        await syncNow();
-      } catch {
-        // offline ok — dados locais bastam para o aha
-      }
+      // Sync remoto em background (syncHealthNow já dispara push). Não bloquear o aha.
+      void syncNow().catch(() => undefined);
       Alert.alert('Fonte conectada', `${imported} amostras Demo importadas.`);
       router.push('/(onboarding)/aha');
     } catch (err) {

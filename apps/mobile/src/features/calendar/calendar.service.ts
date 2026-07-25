@@ -93,8 +93,8 @@ export async function syncCalendarNow(
 
   await setMeta(META_CURSOR, nextCursor);
   await setMeta(META_CONNECTOR, connector.id);
-  const pushed = await pushPendingBatch();
-  return { imported, pushed };
+  void pushPendingBatch().catch(() => undefined);
+  return { imported, pushed: 0 };
 }
 
 /** Gastos sintéticos alinhados aos dias da agenda (explicáveis via source=demo). */

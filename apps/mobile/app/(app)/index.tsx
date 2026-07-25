@@ -34,15 +34,16 @@ export default function TimelineScreen() {
   }, []);
 
   const refreshAll = useCallback(async () => {
+    // Sempre mostra SQLite primeiro — no celular o sync com Railway podia travar a UI.
+    await loadLocal();
     try {
       await syncNow();
       setSyncError(null);
+      await loadLocal();
+      await loadDaily();
     } catch (err) {
-      // Sem rede: timeline local permanece utilizável — mas avisamos (M8).
       setSyncError(err instanceof Error ? err.message : 'Sync falhou');
     }
-    await loadLocal();
-    await loadDaily();
   }, [loadLocal, loadDaily]);
 
   useFocusEffect(

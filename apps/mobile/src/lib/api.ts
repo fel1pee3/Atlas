@@ -4,9 +4,13 @@ import Constants from 'expo-constants';
  * Cliente HTTP do Atlas (docs/17_API_Design.md).
  * - Base URL vem de app.json → extra.apiBaseUrl (ajuste p/ IP local em device físico).
  * - Injeta o access token e trata refresh transparente em 401.
+ * - Timeout padrão evita spinner eterno em rede lenta (Railway + celular).
  */
 const BASE_URL: string =
   (Constants.expoConfig?.extra?.apiBaseUrl as string) ?? 'http://localhost:3333/api';
+
+const DEFAULT_TIMEOUT_MS = 20_000;
+const BATCH_TIMEOUT_MS = 60_000;
 
 export interface AuthTokens {
   accessToken: string;
@@ -31,6 +35,11 @@ export class ApiError extends Error {
     super((problem.detail || problem.title) + suffix);
   }
 }
+
+export type RequestOptions = {
+  timeoutMs?: number;
+  retryOn401?: boolean;
+};
 
 type TokenProvider = () => string | null;
 type RefreshHandler = () => Promise<string | null>;
@@ -57,8 +66,10 @@ async function request<T>(
   method: string,
   path: string,
   body?: unknown,
-  retryOn401 = true,
+  opts: RequestOptions = {},
 ): Promise<T> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const retryOn401 = opts.retryOn401 ?? true;
   const token = getAccessToken();
   const headers: Record<string, string> = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -67,24 +78,35 @@ async function request<T>(
     headers['Content-Type'] = 'application/json';
   }
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
   } catch (err) {
+    const aborted = err instanceof Error && err.name === 'AbortError';
     throw new ApiError(0, {
       title: 'Rede',
       status: 0,
-      detail: err instanceof Error ? err.message : 'Falha de rede',
+      detail: aborted
+        ? `Timeout após ${timeoutMs}ms`
+        : err instanceof Error
+          ? err.message
+          : 'Falha de rede',
     });
+  } finally {
+    clearTimeout(timer);
   }
 
   if (res.status === 401 && retryOn401) {
     const refreshed = await onNeedRefresh();
-    if (refreshed) return request<T>(method, path, body, false);
+    if (refreshed) return request<T>(method, path, body, { ...opts, retryOn401: false });
   }
 
   const text = await res.text();
@@ -101,10 +123,12 @@ async function request<T>(
 }
 
 export const api = {
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body),
-  get: <T>(path: string) => request<T>('GET', path),
-  delete: <T>(path: string) => request<T>('DELETE', path),
+  post: <T>(path: string, body?: unknown, opts?: RequestOptions) =>
+    request<T>('POST', path, body, opts),
+  get: <T>(path: string, opts?: RequestOptions) => request<T>('GET', path, undefined, opts),
+  delete: <T>(path: string, opts?: RequestOptions) => request<T>('DELETE', path, undefined, opts),
   raw: request,
+  timeouts: { default: DEFAULT_TIMEOUT_MS, batch: BATCH_TIMEOUT_MS },
 };
 
 export const accountApi = {

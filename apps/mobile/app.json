@@ -22,8 +22,8 @@
       "expo-status-bar"
     ],
     "extra": {
-      "//": "Ajuste apiBaseUrl para o IP da sua máquina na rede local ao rodar em device físico. Ver docs/31_Getting_Started.md",
-      "apiBaseUrl": "http://10.0.2.2:3333/api"
+      "//": "Produção: Railway. Para API local no emulador Android use http://10.0.2.2:3333/api — docs/31_Getting_Started.md",
+      "apiBaseUrl": "https://atlasapi-production-e625.up.railway.app/api"
     }
   }
 }

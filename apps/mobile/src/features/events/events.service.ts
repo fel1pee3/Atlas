@@ -24,23 +24,27 @@ export interface AddEventLocalInput extends AddEventInput {
 
 export async function addEvent(input: AddEventInput): Promise<LocalEvent> {
   const saved = await addEventLocal(input);
-  try {
-    const res = await api.post<{ created: boolean; event: { id: string } }>('/events', {
-      type: input.type,
-      source: input.source,
-      externalId: saved.row.id,
-      occurredAt: input.occurredAt,
-      payload: input.payload,
-    });
-    await getDb()
-      .update(events)
-      .set({ serverId: res.event.id, syncState: 'synced' })
-      .where(eq(events.id, saved.row.id));
-  } catch {
-    // permanece pending
-  }
-  const [row] = await getDb().select().from(events).where(eq(events.id, saved.row.id));
-  return row;
+  // Offline-first: UI não espera a API (no celular o POST podia travar minutos).
+  void pushOne(saved.row).catch(() => undefined);
+  return saved.row;
+}
+
+async function pushOne(row: LocalEvent): Promise<void> {
+  const res = await api.post<{ created: boolean; event: { id: string } }>(
+    '/events',
+    {
+      type: row.type,
+      source: row.source,
+      externalId: row.id,
+      occurredAt: row.occurredAt,
+      payload: JSON.parse(row.payload) as Record<string, unknown>,
+    },
+    { timeoutMs: api.timeouts.default },
+  );
+  await getDb()
+    .update(events)
+    .set({ serverId: res.event.id, syncState: 'synced' })
+    .where(eq(events.id, row.id));
 }
 
 /**
@@ -81,7 +85,8 @@ export async function pushPending(): Promise<number> {
 }
 
 /**
- * Push em lote via POST /events/batch (docs/17 §4.2) — chunks de 100.
+ * Push em lote via POST /events/batch (docs/17 §4.2).
+ * Chunks menores + sem fallback unitário em massa (evita storm após 499 no celular).
  */
 export async function pushPendingBatch(): Promise<number> {
   const db = getDb();
@@ -89,21 +94,25 @@ export async function pushPendingBatch(): Promise<number> {
   if (pending.length === 0) return 0;
 
   let sent = 0;
-  const chunkSize = 100;
+  const chunkSize = 25;
   for (let i = 0; i < pending.length; i += chunkSize) {
     const chunk = pending.slice(i, i + chunkSize);
     try {
       const res = await api.post<{
         items: Array<{ created: boolean; event: { id: string } }>;
-      }>('/events/batch', {
-        events: chunk.map((ev) => ({
-          type: ev.type,
-          source: ev.source,
-          externalId: ev.id,
-          occurredAt: ev.occurredAt,
-          payload: JSON.parse(ev.payload) as Record<string, unknown>,
-        })),
-      });
+      }>(
+        '/events/batch',
+        {
+          events: chunk.map((ev) => ({
+            type: ev.type,
+            source: ev.source,
+            externalId: ev.id,
+            occurredAt: ev.occurredAt,
+            payload: JSON.parse(ev.payload) as Record<string, unknown>,
+          })),
+        },
+        { timeoutMs: api.timeouts.batch },
+      );
 
       for (let j = 0; j < chunk.length; j += 1) {
         const serverEvent = res.items[j]?.event;
@@ -115,25 +124,7 @@ export async function pushPendingBatch(): Promise<number> {
         sent += 1;
       }
     } catch {
-      // Se o batch falhar, tenta unitário neste chunk.
-      for (const ev of chunk) {
-        try {
-          const unit = await api.post<{ event: { id: string } }>('/events', {
-            type: ev.type,
-            source: ev.source,
-            externalId: ev.id,
-            occurredAt: ev.occurredAt,
-            payload: JSON.parse(ev.payload) as Record<string, unknown>,
-          });
-          await db
-            .update(events)
-            .set({ serverId: unit.event.id, syncState: 'synced' })
-            .where(eq(events.id, ev.id));
-          sent += 1;
-        } catch {
-          // mantém pendente
-        }
-      }
+      // Mantém o chunk pendente para o próximo sync — não dispara N POSTs unitários.
     }
   }
   return sent;
