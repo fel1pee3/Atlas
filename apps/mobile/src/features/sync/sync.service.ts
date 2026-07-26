@@ -6,6 +6,7 @@ import { pushPending } from '../events/events.service';
 import { isHealthEnabled, syncHealthNow } from '../health/health.service';
 import { isLocationEnabled, syncLocationNow } from '../location/location.service';
 import { isCalendarEnabled, syncCalendarNow } from '../calendar/calendar.service';
+import { decideMerge, type RemoteEventLike } from './merge-remote';
 
 /**
  * Sync engine — pull incremental (docs/08_Mobile_Architecture.md §7.5).
@@ -14,15 +15,9 @@ import { isCalendarEnabled, syncCalendarNow } from '../calendar/calendar.service
 
 const CURSOR_KEY = 'events.pull.since';
 
-export interface RemoteEvent {
-  id: string;
+export interface RemoteEvent extends RemoteEventLike {
   userId: string;
-  type: string;
-  source: string;
-  externalId: string | null;
-  occurredAt: string;
   ingestedAt: string;
-  payload: Record<string, unknown>;
 }
 
 interface SyncPullPage {
@@ -69,33 +64,33 @@ async function mergeRemote(remote: RemoteEvent): Promise<'inserted' | 'linked' |
   const db = getDb();
   const localId = remote.externalId;
 
-  if (localId) {
-    const byLocal = await db.select().from(events).where(eq(events.id, localId)).limit(1);
-    if (byLocal[0]) {
-      if (byLocal[0].serverId !== remote.id || byLocal[0].syncState !== 'synced') {
-        await db
-          .update(events)
-          .set({ serverId: remote.id, syncState: 'synced' })
-          .where(eq(events.id, localId));
-      }
-      return 'linked';
+  const byLocal = localId
+    ? (await db.select().from(events).where(eq(events.id, localId)).limit(1))[0]
+    : undefined;
+  const byServer = (
+    await db.select().from(events).where(eq(events.serverId, remote.id)).limit(1)
+  )[0];
+
+  const decision = decideMerge(remote, byLocal ?? null, byServer ?? null);
+
+  if (decision.action === 'link') {
+    if (decision.needsUpdate) {
+      await db
+        .update(events)
+        .set({ serverId: remote.id, syncState: 'synced' })
+        .where(eq(events.id, decision.localId));
     }
+    return 'linked';
   }
+  if (decision.action === 'skip') return 'skipped';
 
-  const byServer = await db.select().from(events).where(eq(events.serverId, remote.id)).limit(1);
-  if (byServer[0]) return 'skipped';
-
-  const id = localId ?? remote.id;
   await db.insert(events).values({
-    id,
-    type: remote.type,
-    source: remote.source,
-    occurredAt:
-      typeof remote.occurredAt === 'string'
-        ? remote.occurredAt
-        : new Date(remote.occurredAt).toISOString(),
-    payload: JSON.stringify(remote.payload ?? {}),
-    serverId: remote.id,
+    id: decision.id,
+    type: decision.type,
+    source: decision.source,
+    occurredAt: decision.occurredAt,
+    payload: decision.payloadJson,
+    serverId: decision.serverId,
     syncState: 'synced',
     createdAt: Date.now(),
   });

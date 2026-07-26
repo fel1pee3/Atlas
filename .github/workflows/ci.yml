@@ -1,6 +1,6 @@
 # =============================================================================
-# Atlas — CI (docs/27_DevOps.md). Valida backend + pacote compartilhado.
-# Mobile (Expo) é validado localmente/EAS por enquanto (ver docs/31_Getting_Started.md).
+# Atlas — CI (docs/27_DevOps.md).
+# API + shared + mobile (typecheck + Jest). Maestro E2E fica local (device).
 # =============================================================================
 name: CI
 
@@ -61,3 +61,26 @@ jobs:
 
       - name: Build (api)
         run: npm run build -w @atlas/api
+
+  mobile:
+    name: Typecheck & Test (mobile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build -w @atlas/shared
+
+      - name: Typecheck (mobile)
+        run: npm run typecheck -w @atlas/mobile
+
+      - name: Unit tests (mobile)
+        run: npm test -w @atlas/mobile

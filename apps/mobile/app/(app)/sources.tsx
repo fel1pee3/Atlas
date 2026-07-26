@@ -37,7 +37,7 @@ import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
  * Fontes M4: Location + Calendar (docs/20 §5, docs/08 §10).
- * Dados reais via expo-location + Google Calendar OAuth.
+ * Dados reais via expo-location + calendário do aparelho (expo-calendar).
  */
 export default function SourcesScreen() {
   const [locConnectors, setLocConnectors] = useState<LocationConnector[]>([]);
@@ -121,28 +121,28 @@ export default function SourcesScreen() {
     void (async () => {
       if (!(await c.isAvailable())) {
         Alert.alert(
-          'Google Calendar não configurado',
+          'Agenda indisponível',
           c.id === 'google_calendar'
-            ? 'Defina googleWebClientId (e googleAndroidClientId) em apps/mobile/app.json → extra, com OAuth no Google Cloud (redirect atlas://).'
-            : `${c.label} ainda não está ligado neste build.`,
+            ? 'Google Calendar precisa de Client ID no app.json (opcional). Prefira “Calendário do aparelho”.'
+            : `${c.label} ainda não está disponível neste dispositivo.`,
         );
         return;
       }
-      primingThen(
-        'Conectar agenda',
+      const message =
         c.id === 'demo'
           ? 'Demo: agenda sintética só para desenvolvimento.'
-          : 'O Atlas lê eventos da agenda (Google) para dar semântica ao tempo.',
-        async () => {
-          const { granted } = await enableCalendar(c);
-          if (!granted) {
-            Alert.alert('Permissão negada', 'Nada foi alterado.');
-            return;
-          }
-          const r = await syncCalendarNow(c);
-          setStatus(`Agenda: ${r.imported} importados`);
-        },
-      );
+          : c.id === 'device_calendar'
+            ? 'O Atlas lê os eventos já salvos na agenda do celular (Samsung, Google sync, etc.), sem login extra.'
+            : 'O Atlas lê eventos via login Google (opcional).';
+      primingThen('Conectar agenda', message, async () => {
+        const { granted } = await enableCalendar(c);
+        if (!granted) {
+          Alert.alert('Permissão negada', 'Nada foi alterado.');
+          return;
+        }
+        const r = await syncCalendarNow(c);
+        setStatus(`Agenda: ${r.imported} importados`);
+      });
     })();
   }
 
@@ -150,8 +150,8 @@ export default function SourcesScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Espaço & agenda</Text>
       <Text style={styles.lead}>
-        Eixos de contexto: onde você esteve e o que estava na agenda — com dados reais do aparelho
-        e do Google Calendar.
+        Eixos de contexto: onde você esteve e o que estava na agenda do celular. Preferência:
+        Calendário do aparelho (sem login Google).
       </Text>
 
       <Text style={styles.section}>Localização</Text>

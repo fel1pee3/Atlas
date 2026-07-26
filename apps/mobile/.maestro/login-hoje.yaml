@@ -1,0 +1,31 @@
+# Smoke E2E: login → tela Hoje (docs/26_Testing.md §7.2).
+#
+# Pré-requisitos:
+#   - APK Atlas instalado (preview): package com.atlas.app
+#   - Conta já criada na API (Railway)
+#   - Maestro CLI: https://maestro.mobile.dev
+#
+# Uso (PowerShell):
+#   $env:MAESTRO_EMAIL="seu@email.com"
+#   $env:MAESTRO_PASSWORD="senha-min-8"
+#   maestro test apps/mobile/.maestro/login-hoje.yaml
+#
+appId: com.atlas.app
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Atlas"
+- tapOn: "Já tem conta? Entrar"
+- tapOn:
+    id: "auth-email"
+- inputText: ${MAESTRO_EMAIL}
+- tapOn:
+    id: "auth-password"
+- inputText: ${MAESTRO_PASSWORD}
+- tapOn:
+    id: "auth-submit"
+- extendedWaitUntil:
+    visible: "Hoje"
+    timeout: 45000
+- assertVisible: "Hoje"
+- assertVisible: "Ajustes"

@@ -54,6 +54,7 @@ export async function disableCalendar(): Promise<void> {
 }
 
 function sourceFor(connector: CalendarConnector): string {
+  if (connector.id === 'device_calendar') return EVENT_SOURCES.DEVICE_CALENDAR;
   if (connector.id === 'google_calendar') return EVENT_SOURCES.GOOGLE_CALENDAR;
   if (connector.id === 'apple_calendar') return EVENT_SOURCES.APPLE_CALENDAR;
   return EVENT_SOURCES.DEMO;

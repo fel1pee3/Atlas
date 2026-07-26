@@ -67,6 +67,8 @@ export default function LoginScreen() {
           keyboardType="email-address"
           value={email}
           onChangeText={setEmail}
+          testID="auth-email"
+          accessibilityLabel="E-mail"
         />
         <TextInput
           style={styles.input}
@@ -75,6 +77,8 @@ export default function LoginScreen() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
+          testID="auth-password"
+          accessibilityLabel="Senha"
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -83,13 +87,18 @@ export default function LoginScreen() {
           style={[styles.button, busy && styles.buttonDisabled]}
           onPress={() => void submit()}
           disabled={busy}
+          testID="auth-submit"
+          accessibilityLabel={mode === 'login' ? 'Entrar' : 'Criar conta'}
         >
           <Text style={styles.buttonText}>
             {busy ? '...' : mode === 'login' ? 'Entrar' : 'Criar conta'}
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
+        <Pressable
+          onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
+          testID="auth-switch-mode"
+        >
           <Text style={styles.switch}>
             {mode === 'login' ? 'Não tem conta? Criar uma' : 'Já tem conta? Entrar'}
           </Text>

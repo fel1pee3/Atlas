@@ -39,6 +39,8 @@ export const EVENT_SOURCES = {
   /** Dados sintéticos do conector Demo (Expo Go) — rastreável, nunca fingir nativo. */
   DEMO: 'demo',
   DEVICE_LOCATION: 'device_location',
+  /** Agenda local do SO (Calendar Provider / expo-calendar). */
+  DEVICE_CALENDAR: 'device_calendar',
   GOOGLE_CALENDAR: 'google_calendar',
   APPLE_CALENDAR: 'apple_calendar',
   SYSTEM: 'system',

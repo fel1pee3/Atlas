@@ -4,6 +4,7 @@ import { EVENT_SOURCES } from '@atlas/shared';
 import { getDb } from '../../db/client';
 import { events, type LocalEvent } from '../../db/schema';
 import { api } from '../../lib/api';
+import { filterDemoEventIds, planAddEventLocal } from './local-event.logic';
 
 /**
  * Serviço de eventos no device (offline-first, docs/08 §offline + §sync).
@@ -55,25 +56,16 @@ async function pushOne(row: LocalEvent): Promise<void> {
 export async function addEventLocal(
   input: AddEventLocalInput,
 ): Promise<{ row: LocalEvent; inserted: boolean }> {
-  const id = input.id ?? Crypto.randomUUID();
+  const generatedId = Crypto.randomUUID();
+  const id = input.id ?? generatedId;
   const db = getDb();
   const existing = await db.select().from(events).where(eq(events.id, id)).limit(1);
-  if (existing[0]) {
-    return { row: existing[0], inserted: false };
+  const plan = planAddEventLocal(existing[0] ?? null, input, generatedId, Date.now());
+  if (!plan.inserted) {
+    return { row: existing[0]!, inserted: false };
   }
-
-  const row = {
-    id,
-    type: input.type,
-    source: input.source,
-    occurredAt: input.occurredAt,
-    payload: JSON.stringify(input.payload),
-    serverId: null as string | null,
-    syncState: 'pending',
-    createdAt: Date.now(),
-  };
-  await db.insert(events).values(row);
-  return { row, inserted: true };
+  await db.insert(events).values(plan.row);
+  return { row: plan.row, inserted: true };
 }
 
 export async function getLocalTimeline(limit = 100): Promise<LocalEvent[]> {
@@ -134,12 +126,10 @@ export async function pushPendingBatch(): Promise<number> {
 /** Remove eventos locais com source=demo (dados fictícios do Expo Go). */
 export async function purgeDemoLocalEvents(): Promise<number> {
   const db = getDb();
-  const rows = await db
-    .select({ id: events.id })
-    .from(events)
-    .where(eq(events.source, EVENT_SOURCES.DEMO));
-  for (const row of rows) {
-    await db.delete(events).where(eq(events.id, row.id));
+  const rows = await db.select({ id: events.id, source: events.source }).from(events);
+  const demoIds = filterDemoEventIds(rows);
+  for (const id of demoIds) {
+    await db.delete(events).where(eq(events.id, id));
   }
-  return rows.length;
+  return demoIds.length;
 }

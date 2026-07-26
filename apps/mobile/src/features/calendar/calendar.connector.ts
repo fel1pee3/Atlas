@@ -1,6 +1,6 @@
 /**
- * Porta do conector de calendário (docs/20 M4 — Google/Apple Calendar).
- * OAuth real fica para o stub; Demo desbloqueia dogfooding no Expo Go.
+ * Porta do conector de calendário (docs/20 M4).
+ * Preferência: agenda do aparelho; Google/Apple OAuth opcional; Demo só em __DEV__.
  */
 
 export interface CalendarSample {
@@ -22,7 +22,7 @@ export interface CalendarPullResult {
 }
 
 export interface CalendarConnector {
-  readonly id: 'demo' | 'google_calendar' | 'apple_calendar';
+  readonly id: 'demo' | 'device_calendar' | 'google_calendar' | 'apple_calendar';
   readonly label: string;
   isAvailable(): Promise<boolean>;
   requestPermissions(): Promise<{ granted: boolean }>;
