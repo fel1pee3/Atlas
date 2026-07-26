@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SplashScreen from 'expo-splash-screen';
 import { colors, font, spacing } from '../theme';
+import { LogoMark } from './Logo';
 
 type Props = {
   /** Só esconde o splash nativo quando a fonte Literata já carregou. */
@@ -10,8 +11,7 @@ type Props = {
 };
 
 /**
- * Tela de carregamento do Atlas — só o nome no centro.
- * Fundo névoa + glow; tipografia Literata. Sem tagline / spinner.
+ * Primeira tela do Atlas — marca flutuando na névoa, sem card/quadrado.
  */
 export function BootScreen({ fontsReady = true }: Props) {
   useEffect(() => {
@@ -22,24 +22,39 @@ export function BootScreen({ fontsReady = true }: Props) {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={[colors.bg, colors.bgDeep, colors.bg]}
-        locations={[0, 0.42, 1]}
-        start={{ x: 0.15, y: 0 }}
-        end={{ x: 0.85, y: 1 }}
+        colors={['#F5F8FA', colors.bg, colors.bgDeep]}
+        locations={[0, 0.45, 1]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.glow} pointerEvents="none" />
-      <Text
-        style={[
-          styles.brand,
-          fontsReady
-            ? { fontFamily: font.family.serifBold }
-            : { fontWeight: '700' },
-        ]}
-        accessibilityRole="header"
-      >
-        Atlas
-      </Text>
+      <View style={styles.glowTop} pointerEvents="none" />
+      <View style={styles.glowBottom} pointerEvents="none" />
+
+      <View style={styles.center}>
+        <LogoMark size={112} />
+        <Text
+          style={[
+            styles.wordmark,
+            fontsReady
+              ? { fontFamily: font.family.serifBold }
+              : { fontWeight: '700' },
+          ]}
+          accessibilityRole="header"
+        >
+          Atlas
+        </Text>
+        <Text
+          style={[
+            styles.tagline,
+            fontsReady
+              ? { fontFamily: font.family.sans }
+              : undefined,
+          ]}
+        >
+          Sua vida, compreendida
+        </Text>
+      </View>
     </View>
   );
 }
@@ -48,23 +63,42 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  glowTop: {
+    position: 'absolute',
+    top: -120,
+    right: -80,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
+    backgroundColor: colors.primaryMuted,
+    opacity: 0.55,
+  },
+  glowBottom: {
+    position: 'absolute',
+    bottom: -140,
+    left: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: 'rgba(42, 107, 99, 0.08)',
+  },
+  center: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.lg,
+    paddingHorizontal: spacing.xl,
   },
-  glow: {
-    position: 'absolute',
-    top: -100,
-    right: -60,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: colors.primaryMuted,
-    opacity: 0.7,
-  },
-  brand: {
+  wordmark: {
+    marginTop: spacing.xl,
     fontSize: 40,
     color: colors.text,
-    letterSpacing: -0.8,
+    letterSpacing: -1,
+  },
+  tagline: {
+    marginTop: spacing.sm,
+    fontSize: font.size.sm,
+    color: colors.textMuted,
+    letterSpacing: 0.2,
   },
 });

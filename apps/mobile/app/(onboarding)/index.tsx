@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useOnboarding } from '../../src/features/onboarding/onboarding.store';
 import { spacing, font } from '../../src/theme';
-import { Screen, Brand, Body, Button, Caption } from '../../src/ui';
+import { Screen, BrandLockup, Body, Button, Caption } from '../../src/ui';
 
 /**
  * Boas-vindas + promessa de privacidade (docs/19 §3, docs/20 §2.7).
@@ -13,7 +13,7 @@ export default function OnboardingWelcome() {
 
   return (
     <Screen style={styles.container} safe={false}>
-      <Brand style={styles.brand}>Atlas</Brand>
+      <BrandLockup markSize={48} style={styles.brand} />
       <Caption style={styles.date}>Sua memória pessoal</Caption>
       <Body style={styles.title}>Sob o seu controle</Body>
       <Body tone="muted" style={styles.body}>

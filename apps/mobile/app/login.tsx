@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../src/state/auth.store';
 import { colors, spacing, font } from '../src/theme';
-import { Screen, Brand, Caption, TextField, Button } from '../src/ui';
+import { Screen, BrandLockup, Caption, TextField, Button } from '../src/ui';
 
 /**
  * Login/registro em /login (rota explícita).
@@ -51,7 +51,7 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.header}>
-          <Brand>Atlas</Brand>
+          <BrandLockup markSize={52} style={styles.brand} />
           <Caption style={styles.tagline}>Sua vida, compreendida. Seus dados, seus.</Caption>
         </View>
 
@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: { marginBottom: spacing.xxl },
+  brand: { marginBottom: spacing.xs },
   tagline: {
     marginTop: spacing.sm,
     fontSize: font.size.sm,
