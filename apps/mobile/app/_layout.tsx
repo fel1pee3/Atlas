@@ -1,13 +1,27 @@
 import { useEffect } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, ActivityIndicator } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  Literata_600SemiBold,
+  Literata_700Bold,
+} from '@expo-google-fonts/literata';
+import {
+  DMSans_400Regular,
+  DMSans_500Medium,
+  DMSans_600SemiBold,
+  DMSans_700Bold,
+} from '@expo-google-fonts/dm-sans';
 import { useAuth } from '../src/state/auth.store';
 import { initLocalDb } from '../src/db/client';
 import { useOnboarding } from '../src/features/onboarding/onboarding.store';
 import { recordAppOpen } from '../src/features/dogfood/dogfood.service';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
-import { colors } from '../src/theme';
+import { colors, font } from '../src/theme';
+import { BootScreen } from '../src/ui';
+
+void SplashScreen.preventAutoHideAsync();
 
 /**
  * Rotas:
@@ -20,12 +34,26 @@ import { colors } from '../src/theme';
  * abria a timeline ("Hoje") em vez do login.
  */
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Literata_600SemiBold,
+    Literata_700Bold,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_600SemiBold,
+    DMSans_700Bold,
+  });
+
   const status = useAuth((s) => s.status);
   const hydrate = useAuth((s) => s.hydrate);
   const onboarded = useOnboarding((s) => s.done);
   const refreshOnboarding = useOnboarding((s) => s.refresh);
   const segments = useSegments();
   const router = useRouter();
+
+  const bootReady =
+    fontsLoaded &&
+    status !== 'loading' &&
+    !(status === 'authenticated' && onboarded === null);
 
   useEffect(() => {
     try {
@@ -44,8 +72,7 @@ export default function RootLayout() {
   }, [status, refreshOnboarding]);
 
   useEffect(() => {
-    if (status === 'loading') return;
-    if (status === 'authenticated' && onboarded === null) return;
+    if (!bootReady) return;
 
     const root = segments[0];
     const onLogin = root === 'login';
@@ -68,20 +95,27 @@ export default function RootLayout() {
     if (onLogin || inOnboarding || !inApp) {
       router.replace('/(app)');
     }
-  }, [status, onboarded, segments, router]);
+  }, [bootReady, status, onboarded, segments, router]);
 
-  if (status === 'loading' || (status === 'authenticated' && onboarded === null)) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+  if (!bootReady) {
+    return <BootScreen fontsReady={fontsLoaded} />;
   }
 
   return (
     <ErrorBoundary>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      <StatusBar style="dark" />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+          headerTitleStyle: {
+            fontFamily: font.family.serif,
+            fontSize: font.size.lg,
+            color: colors.text,
+          },
+          headerBackTitleStyle: { fontFamily: font.family.sans },
+        }}
+      />
     </ErrorBoundary>
   );
 }

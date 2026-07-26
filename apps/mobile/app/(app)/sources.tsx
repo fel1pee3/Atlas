@@ -1,13 +1,5 @@
 import { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { LocationConnector } from '../../src/features/location/location.connector';
 import {
@@ -33,11 +25,20 @@ import {
   getActiveCalendarConnectorId,
   syncCalendarNow,
 } from '../../src/features/calendar/calendar.service';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { colors, spacing } from '../../src/theme';
+import {
+  Screen,
+  Caption,
+  Button,
+  PageHeader,
+  SectionTitle,
+  EntryRow,
+  Hairline,
+  pagePad,
+} from '../../src/ui';
 
 /**
  * Fontes M4: Location + Calendar (docs/20 §5, docs/08 §10).
- * Dados reais via expo-location + calendário do aparelho (expo-calendar).
  */
 export default function SourcesScreen() {
   const [locConnectors, setLocConnectors] = useState<LocationConnector[]>([]);
@@ -64,11 +65,7 @@ export default function SourcesScreen() {
     }, [refresh]),
   );
 
-  function primingThen(
-    title: string,
-    message: string,
-    onContinue: () => Promise<void>,
-  ) {
+  function primingThen(title: string, message: string, onContinue: () => Promise<void>) {
     Alert.alert(title, message, [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -95,15 +92,15 @@ export default function SourcesScreen() {
       if (!(await c.isAvailable())) {
         Alert.alert(
           'Fonte indisponível',
-          'Localização nativa requer development build com expo-location.',
+          'Localização do aparelho precisa da versão de desenvolvimento do Atlas.',
         );
         return;
       }
       primingThen(
         'Conectar localização',
         c.id === 'demo'
-          ? 'Demo: visitas sintéticas só para desenvolvimento.'
-          : 'O Atlas registra visitas (lugares), não um rastro contínuo de GPS.',
+          ? 'Demo: visitas de exemplo só para testar no desenvolvimento.'
+          : 'O Atlas registra lugares visitados — não um rastro contínuo de GPS.',
         async () => {
           const { granted } = await enableLocation(c);
           if (!granted) {
@@ -111,7 +108,11 @@ export default function SourcesScreen() {
             return;
           }
           const r = await syncLocationNow(c);
-          setStatus(`Local: ${r.imported} importados`);
+          setStatus(
+            r.imported === 1
+              ? 'Localização: 1 visita nova'
+              : `Localização: ${r.imported} visitas novas`,
+          );
         },
       );
     })();
@@ -123,17 +124,17 @@ export default function SourcesScreen() {
         Alert.alert(
           'Agenda indisponível',
           c.id === 'google_calendar'
-            ? 'Google Calendar precisa de Client ID no app.json (opcional). Prefira “Calendário do aparelho”.'
-            : `${c.label} ainda não está disponível neste dispositivo.`,
+            ? 'Google Agenda ainda não está configurada neste build. Prefira “Calendário do aparelho”.'
+            : `${calendarLabel(c)} ainda não está disponível neste aparelho.`,
         );
         return;
       }
       const message =
         c.id === 'demo'
-          ? 'Demo: agenda sintética só para desenvolvimento.'
+          ? 'Demo: agenda de exemplo só para testar no desenvolvimento.'
           : c.id === 'device_calendar'
-            ? 'O Atlas lê os eventos já salvos na agenda do celular (Samsung, Google sync, etc.), sem login extra.'
-            : 'O Atlas lê eventos via login Google (opcional).';
+            ? 'O Atlas lê os compromissos já salvos na agenda do celular, sem login extra.'
+            : 'O Atlas lê compromissos com login na Google Agenda (opcional).';
       primingThen('Conectar agenda', message, async () => {
         const { granted } = await enableCalendar(c);
         if (!granted) {
@@ -141,163 +142,150 @@ export default function SourcesScreen() {
           return;
         }
         const r = await syncCalendarNow(c);
-        setStatus(`Agenda: ${r.imported} importados`);
+        setStatus(
+          r.imported === 1
+            ? 'Agenda: 1 compromisso novo'
+            : `Agenda: ${r.imported} compromissos novos`,
+        );
       });
     })();
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Espaço & agenda</Text>
-      <Text style={styles.lead}>
-        Eixos de contexto: onde você esteve e o que estava na agenda do celular. Preferência:
-        Calendário do aparelho (sem login Google).
-      </Text>
+    <Screen padded={false} safe={false}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <PageHeader
+          title="Espaço & agenda"
+          lead="Onde você esteve e o que estava marcado. Preferência: calendário do aparelho."
+        />
 
-      <Text style={styles.section}>Localização</Text>
-      {locConnectors.map((c) => (
-        <View key={c.id} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{c.label}</Text>
-            {locActive === c.id && locEnabled ? <Text style={styles.badge}>ativo</Text> : null}
+        <SectionTitle>Localização</SectionTitle>
+        {locConnectors.map((c, index) => (
+          <View key={c.id}>
+            {index > 0 ? <Hairline /> : null}
+            <EntryRow
+              kind={c.id === 'demo' ? 'Demo' : 'Lugares'}
+              meta={c.id === 'demo' ? 'dados de exemplo' : 'visitas'}
+              trailing={locActive === c.id && locEnabled ? 'ativo' : undefined}
+            >
+              <Caption style={styles.name}>{locationLabel(c)}</Caption>
+              <Button
+                label={locActive === c.id && locEnabled ? 'Atualizar' : 'Conectar'}
+                onPress={() => onConnectLocation(c)}
+                busy={busy}
+                style={styles.btn}
+              />
+            </EntryRow>
           </View>
-          {c.id === 'demo' ? <Text style={styles.meta}>somente __DEV__</Text> : null}
-          <Pressable
-            style={[styles.button, busy && styles.disabled]}
-            disabled={busy}
-            onPress={() => onConnectLocation(c)}
-          >
-            <Text style={styles.buttonText}>
-              {locActive === c.id && locEnabled ? 'Atualizar' : 'Conectar'}
-            </Text>
-          </Pressable>
-        </View>
-      ))}
-      {locEnabled ? (
-        <View style={styles.row}>
-          <Pressable
-            style={styles.secondary}
-            disabled={busy}
-            onPress={() => {
-              void (async () => {
-                setBusy(true);
-                try {
-                  const r = await syncLocationNow(
-                    locConnectors.find((x) => x.id === locActive) ?? resolveLocationConnector(),
-                  );
-                  setStatus(`Local: ${r.imported} novos`);
-                } finally {
-                  setBusy(false);
-                }
-              })();
-            }}
-          >
-            <Text style={styles.secondaryText}>Sync localização</Text>
-          </Pressable>
-          <Pressable onPress={() => void disableLocation().then(refresh)}>
-            <Text style={styles.link}>Desativar</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <Text style={styles.section}>Calendário</Text>
-      {calConnectors.map((c) => (
-        <View key={c.id} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{c.label}</Text>
-            {calActive === c.id && calEnabled ? <Text style={styles.badge}>ativo</Text> : null}
+        ))}
+        {locEnabled ? (
+          <View style={styles.actions}>
+            <Button
+              variant="secondary"
+              label="Atualizar localização"
+              disabled={busy}
+              onPress={() => {
+                void (async () => {
+                  setBusy(true);
+                  try {
+                    const r = await syncLocationNow(
+                      locConnectors.find((x) => x.id === locActive) ?? resolveLocationConnector(),
+                    );
+                    setStatus(
+                      r.imported === 1
+                        ? 'Localização: 1 visita nova'
+                        : `Localização: ${r.imported} visitas novas`,
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            />
+            <Button
+              variant="ghost"
+              label="Desconectar localização"
+              onPress={() => void disableLocation().then(refresh)}
+            />
           </View>
-          {c.id === 'demo' ? <Text style={styles.meta}>somente __DEV__</Text> : null}
-          <Pressable
-            style={[styles.button, busy && styles.disabled]}
-            disabled={busy}
-            onPress={() => onConnectCalendar(c)}
-          >
-            <Text style={styles.buttonText}>
-              {calActive === c.id && calEnabled ? 'Atualizar' : 'Conectar'}
-            </Text>
-          </Pressable>
-        </View>
-      ))}
-      {calEnabled ? (
-        <View style={styles.row}>
-          <Pressable
-            style={styles.secondary}
-            disabled={busy}
-            onPress={() => {
-              void (async () => {
-                setBusy(true);
-                try {
-                  const r = await syncCalendarNow(
-                    calConnectors.find((x) => x.id === calActive) ?? resolveCalendarConnector(),
-                  );
-                  setStatus(`Agenda: ${r.imported} novos`);
-                } finally {
-                  setBusy(false);
-                }
-              })();
-            }}
-          >
-            <Text style={styles.secondaryText}>Sync agenda</Text>
-          </Pressable>
-          <Pressable onPress={() => void disableCalendar().then(refresh)}>
-            <Text style={styles.link}>Desativar</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        ) : null}
 
-      {busy ? <ActivityIndicator color={colors.primary} /> : null}
-      {status ? <Text style={styles.footer}>{status}</Text> : null}
-    </ScrollView>
+        <SectionTitle>Agenda</SectionTitle>
+        {calConnectors.map((c, index) => (
+          <View key={c.id}>
+            {index > 0 ? <Hairline /> : null}
+            <EntryRow
+              kind={c.id === 'demo' ? 'Demo' : 'Agenda'}
+              meta={c.id === 'demo' ? 'dados de exemplo' : 'compromissos'}
+              trailing={calActive === c.id && calEnabled ? 'ativo' : undefined}
+            >
+              <Caption style={styles.name}>{calendarLabel(c)}</Caption>
+              <Button
+                label={calActive === c.id && calEnabled ? 'Atualizar' : 'Conectar'}
+                onPress={() => onConnectCalendar(c)}
+                busy={busy}
+                style={styles.btn}
+              />
+            </EntryRow>
+          </View>
+        ))}
+        {calEnabled ? (
+          <View style={styles.actions}>
+            <Button
+              variant="secondary"
+              label="Atualizar agenda"
+              disabled={busy}
+              onPress={() => {
+                void (async () => {
+                  setBusy(true);
+                  try {
+                    const r = await syncCalendarNow(
+                      calConnectors.find((x) => x.id === calActive) ?? resolveCalendarConnector(),
+                    );
+                    setStatus(
+                      r.imported === 1
+                        ? 'Agenda: 1 compromisso novo'
+                        : `Agenda: ${r.imported} compromissos novos`,
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                })();
+              }}
+            />
+            <Button
+              variant="ghost"
+              label="Desconectar agenda"
+              onPress={() => void disableCalendar().then(refresh)}
+            />
+          </View>
+        ) : null}
+
+        {busy ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} /> : null}
+        {status ? <Caption style={styles.footer}>{status}</Caption> : null}
+      </ScrollView>
+    </Screen>
   );
 }
 
+function locationLabel(c: LocationConnector): string {
+  if (c.id === 'demo') return 'Demo (só desenvolvimento)';
+  if (c.id === 'device_location') return 'Localização do aparelho';
+  return c.label.replace(/device/gi, 'aparelho').replace(/\(__DEV__ only\)/i, '(só desenvolvimento)');
+}
+
+function calendarLabel(c: CalendarConnector): string {
+  if (c.id === 'demo') return 'Demo (só desenvolvimento)';
+  if (c.id === 'device_calendar') return 'Calendário do aparelho';
+  if (c.id === 'google_calendar') return 'Google Agenda';
+  if (c.id === 'apple_calendar') return 'Calendário Apple';
+  return c.label.replace(/\(__DEV__ only\)/i, '(só desenvolvimento)');
+}
+
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xl },
-  title: { color: colors.text, fontSize: font.size.xl, fontWeight: font.weight.semibold },
-  lead: { color: colors.textMuted, fontSize: font.size.md, lineHeight: 22, marginBottom: spacing.sm },
-  section: {
-    color: colors.text,
-    fontSize: font.size.lg,
-    fontWeight: font.weight.semibold,
-    marginTop: spacing.md,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { color: colors.text, fontSize: font.size.md, fontWeight: font.weight.semibold },
-  badge: { color: colors.success, fontSize: font.size.sm },
-  meta: { color: colors.textMuted, fontSize: font.size.sm },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  disabled: { opacity: 0.6 },
-  buttonText: { color: colors.primaryText, fontWeight: font.weight.semibold },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  secondary: {
-    flex: 1,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  secondaryText: { color: colors.text },
-  link: { color: colors.textMuted, padding: spacing.sm },
-  footer: { color: colors.textMuted, fontSize: font.size.sm, textAlign: 'center', marginTop: spacing.sm },
+  container: { ...pagePad },
+  name: { marginTop: 2, marginBottom: spacing.sm, color: colors.text },
+  btn: { marginTop: spacing.xs },
+  actions: { gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.sm },
+  footer: { marginTop: spacing.md },
 });

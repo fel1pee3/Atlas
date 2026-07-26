@@ -1,25 +1,26 @@
 import { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   generateInsights,
   listInsights,
   type InsightListItem,
 } from '../../src/features/insights/insights.service';
-import { isCrossDomainKind } from '@atlas/shared';
 import { isAbortLikeError } from '../../src/lib/api';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { insightListMeta, insightThemeLabel } from '../../src/lib/humanize';
+import { colors, spacing, font } from '../../src/theme';
+import {
+  Screen,
+  Title,
+  Body,
+  Caption,
+  EntryRow,
+  Hairline,
+  pagePad,
+} from '../../src/ui';
 
 /**
- * Feed de insights (docs/19 §7). Gera sob demanda no foco/refresh (MVP sem worker).
+ * Feed de insights (docs/19 §7).
  */
 export default function InsightsScreen() {
   const router = useRouter();
@@ -31,7 +32,6 @@ export default function InsightsScreen() {
   const load = useCallback(async (regen: boolean) => {
     setError(null);
     try {
-      // Lista primeiro (rápido); generate depois — se generate timeout, ainda vemos o que já existe.
       setItems(await listInsights());
       setLoading(false);
       if (regen) {
@@ -73,80 +73,71 @@ export default function InsightsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <Screen style={styles.center} safe={false} padded={false}>
         <ActivityIndicator color={colors.primary} />
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <FlatList
-      data={items}
-      keyExtractor={(it) => it.id}
-      contentContainerStyle={styles.list}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-      }
-      ListHeaderComponent={
-        <Text style={styles.lead}>
-          Insights heurísticos (intra e cross-domain) com evidências. Sem LLM. Cross-domain =
-          a prova da tese do Atlas.
-        </Text>
-      }
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>Ainda observando</Text>
-          <Text style={styles.emptyText}>
-            {error ??
-              'Conecte Saúde + Fontes (Demo) e volte aqui. Os padrões cross-domain precisam de alguns dias de dados.'}
-          </Text>
-        </View>
-      }
-      renderItem={({ item }) => (
-        <Pressable
-          style={[styles.card, isCrossDomainKind(item.kind) && styles.cardCross]}
-          onPress={() => router.push(`/(app)/insight/${item.id}`)}
-        >
-          <View style={styles.cardHeader}>
-            <Text style={styles.method}>
-              {isCrossDomainKind(item.kind) ? 'cross-domain' : item.method}
-            </Text>
-            {item.status === 'useful' ? <Text style={styles.useful}>útil</Text> : null}
+    <Screen padded={false} safe={false}>
+      <FlatList
+        data={items}
+        keyExtractor={(it) => it.id}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+        ListHeaderComponent={
+          <Caption style={styles.lead}>
+            Observações com evidências da sua timeline — sono, passos, agenda, humor e gastos.
+          </Caption>
+        }
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Title style={styles.emptyTitle}>Ainda observando</Title>
+            <Body tone="muted" style={styles.emptyText}>
+              {error ??
+                'Conecte Saúde e Fontes. Os padrões precisam de alguns dias de dados.'}
+            </Body>
           </View>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.body} numberOfLines={3}>
-            {item.body}
-          </Text>
-          <Text style={styles.meta}>
-            {item.evidence.length} evidência{item.evidence.length === 1 ? '' : 's'}
-            {item.confidence != null ? ` · confiança ${(item.confidence * 100).toFixed(0)}%` : ''}
-          </Text>
-        </Pressable>
-      )}
-    />
+        }
+        renderItem={({ item }) => (
+          <EntryRow
+            kind={insightThemeLabel(item.kind)}
+            meta={insightListMeta(item.evidence.length, item.confidence)}
+            trailing={item.status === 'useful' ? 'útil' : undefined}
+            onPress={() => router.push(`/(app)/insight/${item.id}`)}
+          >
+            <Body style={styles.itemTitle}>{item.title}</Body>
+            <Caption numberOfLines={3} style={styles.itemBody}>
+              {item.body}
+            </Caption>
+          </EntryRow>
+        )}
+        ItemSeparatorComponent={() => <Hairline />}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  list: { padding: spacing.md, gap: spacing.sm, flexGrow: 1, backgroundColor: colors.bg },
-  lead: { color: colors.textMuted, fontSize: font.size.sm, marginBottom: spacing.sm, lineHeight: 18 },
-  empty: { padding: spacing.xl, alignItems: 'center', gap: spacing.sm },
-  emptyTitle: { color: colors.text, fontSize: font.size.lg, fontWeight: font.weight.semibold },
-  emptyText: { color: colors.textMuted, textAlign: 'center' },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
+  center: { alignItems: 'center', justifyContent: 'center' },
+  list: { ...pagePad, flexGrow: 1 },
+  lead: { marginBottom: spacing.md, lineHeight: 20 },
+  empty: { paddingTop: spacing.xl, gap: spacing.sm },
+  emptyTitle: { fontSize: font.size.lg },
+  emptyText: { lineHeight: 22, maxWidth: 300 },
+  itemTitle: {
+    fontFamily: font.family.serif,
+    fontSize: font.size.lg,
+    letterSpacing: -0.2,
+    marginBottom: 4,
   },
-  cardCross: { borderColor: colors.primary },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  method: { color: colors.primary, fontSize: font.size.sm, textTransform: 'uppercase' },
-  useful: { color: colors.success, fontSize: font.size.sm },
-  title: { color: colors.text, fontSize: font.size.lg, fontWeight: font.weight.semibold },
-  body: { color: colors.textMuted, fontSize: font.size.md, lineHeight: 20 },
-  meta: { color: colors.textMuted, fontSize: font.size.sm, marginTop: spacing.xs },
+  itemBody: { lineHeight: 20 },
 });

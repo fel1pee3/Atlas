@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../src/state/auth.store';
-import { colors } from '../../src/theme';
+import { colors, font } from '../../src/theme';
+import { BootScreen, HomeMenu } from '../../src/ui';
 
 /**
  * Stack do app logado. Se a sessão caiu, não renderiza as telas
@@ -11,22 +11,30 @@ export default function AppLayout() {
   const status = useAuth((s) => s.status);
 
   if (status !== 'authenticated') {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
+    return <BootScreen fontsReady />;
   }
 
   return (
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
+        headerShadowVisible: false,
+        headerTintColor: colors.primary,
+        headerTitleStyle: {
+          fontFamily: font.family.serif,
+          fontSize: font.size.lg,
+          color: colors.text,
+        },
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Hoje' }} />
+      <Stack.Screen
+        name="index"
+        options={{
+          title: 'Atlas',
+          headerRight: () => <HomeMenu />,
+        }}
+      />
       <Stack.Screen name="add" options={{ title: 'Registrar', presentation: 'modal' }} />
       <Stack.Screen name="health" options={{ title: 'Saúde' }} />
       <Stack.Screen name="sources" options={{ title: 'Espaço & agenda' }} />

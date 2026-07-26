@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { colors, spacing, font } from '../theme';
+import { Title, Body, Button } from '../ui';
 
 interface Props {
   children: ReactNode;
@@ -28,11 +29,11 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <View style={styles.box}>
-          <Text style={styles.title}>Algo quebrou na UI</Text>
-          <Text style={styles.body}>{this.state.error.message}</Text>
-          <Pressable style={styles.btn} onPress={() => this.setState({ error: null })}>
-            <Text style={styles.btnText}>Tentar de novo</Text>
-          </Pressable>
+          <Title style={styles.title}>Algo quebrou na UI</Title>
+          <Body tone="muted" style={styles.body}>
+            {this.state.error.message}
+          </Body>
+          <Button label="Tentar de novo" onPress={() => this.setState({ error: null })} />
         </View>
       );
     }
@@ -47,13 +48,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
-  title: { color: colors.text, fontSize: font.size.lg, fontWeight: '600', marginBottom: spacing.sm },
-  body: { color: colors.textMuted, marginBottom: spacing.lg, lineHeight: 20 },
-  btn: {
-    backgroundColor: colors.primary,
-    padding: spacing.md,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  btnText: { color: colors.primaryText, fontWeight: '600' },
+  title: { marginBottom: spacing.sm, fontFamily: font.family.serif },
+  body: { marginBottom: spacing.lg },
 });

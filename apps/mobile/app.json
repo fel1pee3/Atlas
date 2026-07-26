@@ -5,8 +5,13 @@
     "version": "0.0.1",
     "scheme": "atlas",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#EEF2F4"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.atlas.app",
@@ -56,6 +61,16 @@
             "compileSdkVersion": 36,
             "targetSdkVersion": 36
           }
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "imageWidth": 390,
+          "resizeMode": "cover",
+          "backgroundColor": "#EEF2F4"
         }
       ]
     ],

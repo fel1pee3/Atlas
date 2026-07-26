@@ -65,7 +65,7 @@ function samplesForDay(day: string): HealthSample[] {
 
 export class DemoHealthConnector implements HealthConnector {
   readonly id = 'demo' as const;
-  readonly label = 'Demo (__DEV__ only)';
+  readonly label = 'Demo (só desenvolvimento)';
 
   async isAvailable(): Promise<boolean> {
     return true;

@@ -6,7 +6,7 @@ import type { LocationConnector, LocationPullResult } from './location.connector
  */
 export class NativeLocationConnectorStub implements LocationConnector {
   readonly id = 'device_location' as const;
-  readonly label = 'Localização do device';
+  readonly label = 'Localização do aparelho';
 
   async isAvailable(): Promise<boolean> {
     return false;

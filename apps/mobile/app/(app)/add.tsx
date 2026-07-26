@@ -1,16 +1,13 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Pressable, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { EVENT_SOURCES, EVENT_TYPES } from '@atlas/shared';
 import { addEvent } from '../../src/features/events/events.service';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { colors, spacing, font } from '../../src/theme';
+import { Screen, TextField, Button, Caption, PageHeader } from '../../src/ui';
 
 type Kind = 'note' | 'mood' | 'expense';
 
-/**
- * Aceita "10", "10.50", "10,50", "1.234,56", "R$ 10,50".
- * Evita Number("10,50") === NaN → JSON null na timeline.
- */
 function parseAmount(raw: string): number | null {
   let normalized = raw.trim().replace(/\s/g, '').replace(/R\$/gi, '');
   if (!normalized) return null;
@@ -18,21 +15,17 @@ function parseAmount(raw: string): number | null {
   const hasComma = normalized.includes(',');
   const hasDot = normalized.includes('.');
   if (hasComma && hasDot) {
-    // Formato BR com milhar: 1.234,56
     normalized = normalized.replace(/\./g, '').replace(',', '.');
   } else if (hasComma) {
-    // Formato BR sem milhar: 10,50
     normalized = normalized.replace(',', '.');
   }
-  // Só ponto → decimal internacional (10.50)
 
   const value = Number(normalized);
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 /**
- * Entrada manual (docs/20_MVP.md §2.2). Fallback universal e gerador dos dados
- * subjetivos (humor) que nenhuma API fornece. Grava offline-first.
+ * Entrada manual (docs/20_MVP.md §2.2).
  */
 export default function AddEventScreen() {
   const router = useRouter();
@@ -85,27 +78,27 @@ export default function AddEventScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <Screen safe={false} padded style={styles.container}>
+      <PageHeader title="Registrar" lead="Nota, humor ou gasto — fica no aparelho primeiro." />
+
       <View style={styles.tabs}>
         {(['note', 'mood', 'expense'] as Kind[]).map((k) => (
           <Pressable
             key={k}
-            style={[styles.tab, kind === k && styles.tabActive]}
+            style={[styles.tab, kind === k && styles.tabOn]}
             onPress={() => setKind(k)}
           >
-            <Text style={[styles.tabText, kind === k && styles.tabTextActive]}>
+            <Caption style={kind === k ? styles.tabOnText : styles.tabText}>
               {k === 'note' ? 'Nota' : k === 'mood' ? 'Humor' : 'Gasto'}
-            </Text>
+            </Caption>
           </Pressable>
         ))}
       </View>
 
       {kind === 'note' && (
-        <TextInput
-          style={[styles.input, styles.multiline]}
-          placeholder="O que aconteceu?"
-          placeholderTextColor={colors.textMuted}
+        <TextField
           multiline
+          placeholder="O que aconteceu?"
           value={text}
           onChangeText={setText}
         />
@@ -116,78 +109,69 @@ export default function AddEventScreen() {
           {[1, 2, 3, 4, 5].map((n) => (
             <Pressable
               key={n}
-              style={[styles.moodDot, mood === n && styles.moodDotActive]}
+              style={[styles.moodDot, mood === n && styles.moodDotOn]}
               onPress={() => setMood(n)}
             >
-              <Text style={[styles.moodText, mood === n && styles.moodTextActive]}>{n}</Text>
+              <Caption style={mood === n ? styles.moodOnText : styles.moodText}>{n}</Caption>
             </Pressable>
           ))}
         </View>
       )}
 
       {kind === 'expense' && (
-        <TextInput
-          style={styles.input}
+        <TextField
           placeholder="Valor (R$)"
-          placeholderTextColor={colors.textMuted}
           keyboardType="decimal-pad"
           value={amount}
           onChangeText={setAmount}
         />
       )}
 
-      <Pressable style={[styles.button, busy && styles.buttonDisabled]} onPress={save} disabled={busy}>
-        <Text style={styles.buttonText}>{busy ? '...' : 'Registrar'}</Text>
-      </Pressable>
-    </View>
+      <Button label="Registrar" onPress={() => void save()} busy={busy} style={styles.save} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg, gap: spacing.lg },
-  tabs: { flexDirection: 'row', gap: spacing.sm },
+  container: { paddingTop: spacing.md, gap: spacing.lg },
+  tabs: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    gap: spacing.md,
+  },
   tab: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    marginBottom: -StyleSheet.hairlineWidth,
   },
-  tabActive: { backgroundColor: colors.surfaceAlt, borderColor: colors.primary },
-  tabText: { color: colors.textMuted },
-  tabTextActive: { color: colors.text, fontWeight: font.weight.semibold },
-  input: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    color: colors.text,
-    fontSize: font.size.md,
+  tabOn: { borderBottomColor: colors.primary },
+  tabText: { color: colors.textMuted, fontFamily: font.family.sansMedium },
+  tabOnText: { color: colors.primary, fontFamily: font.family.sansSemi },
+  moodRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
-  multiline: { minHeight: 120, textAlignVertical: 'top' },
-  moodRow: { flexDirection: 'row', justifyContent: 'space-between' },
   moodDot: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  moodDotActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  moodText: { color: colors.textMuted, fontSize: font.size.lg },
-  moodTextActive: { color: colors.primaryText, fontWeight: font.weight.bold },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
+  moodDotOn: { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+  moodText: {
+    fontSize: font.size.lg,
+    color: colors.textMuted,
+    fontFamily: font.family.serif,
   },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: colors.primaryText, fontWeight: font.weight.semibold, fontSize: font.size.md },
+  moodOnText: {
+    fontSize: font.size.lg,
+    color: colors.primary,
+    fontFamily: font.family.serifBold,
+  },
+  save: { marginTop: spacing.sm },
 });

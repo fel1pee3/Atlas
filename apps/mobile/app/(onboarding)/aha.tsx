@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   generateInsights,
@@ -8,7 +8,9 @@ import {
 } from '../../src/features/insights/insights.service';
 import { fetchDailySummary } from '../../src/features/sync/sync.service';
 import { useOnboarding } from '../../src/features/onboarding/onboarding.store';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { colors, spacing, font } from '../../src/theme';
+import { insightThemeLabel } from '../../src/lib/humanize';
+import { Screen, Title, Body, Caption, Button, EntryRow, Hairline } from '../../src/ui';
 
 /**
  * Primeiro "aha" — insight heurístico ou resumo de sono (docs/20 §2.7).
@@ -54,70 +56,57 @@ export default function OnboardingAha() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <Screen style={styles.center} safe={false}>
         <ActivityIndicator color={colors.primary} />
-        <Text style={styles.muted}>Gerando sua primeira observação…</Text>
-      </View>
+        <Caption>Gerando sua primeira observação…</Caption>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.kicker}>Primeiro insight</Text>
+    <Screen style={styles.container} safe={false}>
+      <Title style={styles.title}>Primeiro insight</Title>
+      <Caption style={styles.lead}>Uma observação a partir dos seus dados</Caption>
+
+      <Hairline />
       {insight ? (
-        <View style={styles.card}>
-          <Text style={styles.method}>{insight.method}</Text>
-          <Text style={styles.title}>{insight.title}</Text>
-          <Text style={styles.body}>{insight.body}</Text>
-        </View>
+        <EntryRow kind={insightThemeLabel(insight.kind)}>
+          <Body style={styles.itemTitle}>{insight.title}</Body>
+          <Body tone="muted">{insight.body}</Body>
+        </EntryRow>
       ) : (
-        <View style={styles.card}>
-          <Text style={styles.title}>Você está no ar</Text>
-          <Text style={styles.body}>{fallback}</Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </View>
+        <EntryRow kind="atlas">
+          <Body style={styles.itemTitle}>Você está no ar</Body>
+          <Body tone="muted">{fallback}</Body>
+          {error ? <Caption tone="danger">{error}</Caption> : null}
+        </EntryRow>
       )}
+      <Hairline />
 
-      <Text style={styles.hint}>
+      <Caption style={styles.hint}>
         Próximo passo opcional: registre o humor de hoje (+) para semear correlações.
-      </Text>
+      </Caption>
 
-      <Pressable style={styles.primary} onPress={() => void finish()}>
-        <Text style={styles.primaryText}>Ir para o Atlas</Text>
-      </Pressable>
-    </View>
+      <Button label="Ir para o Atlas" onPress={() => void finish()} />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
-  container: { flex: 1, padding: spacing.lg, justifyContent: 'center' },
-  kicker: {
-    color: colors.primary,
-    fontSize: font.size.sm,
-    fontWeight: '600',
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
+  center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md },
+  container: { justifyContent: 'center', paddingVertical: spacing.lg },
+  title: {
+    fontSize: font.size.xxl,
+    fontFamily: font.family.serifBold,
+    letterSpacing: -0.5,
+    marginBottom: 4,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
+  lead: { marginBottom: spacing.lg },
+  itemTitle: {
+    fontFamily: font.family.serif,
+    fontSize: font.size.lg,
+    letterSpacing: -0.2,
+    marginBottom: 4,
   },
-  method: { color: colors.textMuted, fontSize: font.size.sm, marginBottom: 4 },
-  title: { color: colors.text, fontSize: font.size.lg, fontWeight: '600', marginBottom: spacing.sm },
-  body: { color: colors.text, lineHeight: 22, opacity: 0.9 },
-  muted: { color: colors.textMuted },
-  error: { color: colors.danger, marginTop: spacing.sm, fontSize: font.size.sm },
-  hint: { color: colors.textMuted, marginBottom: spacing.lg, lineHeight: 20 },
-  primary: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    alignItems: 'center',
-  },
-  primaryText: { color: colors.primaryText, fontWeight: '600' },
+  hint: { marginTop: spacing.lg, marginBottom: spacing.lg, lineHeight: 20 },
 });

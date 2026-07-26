@@ -52,7 +52,7 @@ function samplesForDay(day: string): CalendarSample[] {
 
 export class DemoCalendarConnector implements CalendarConnector {
   readonly id = 'demo' as const;
-  readonly label = 'Demo (__DEV__ only)';
+  readonly label = 'Demo (só desenvolvimento)';
 
   async isAvailable(): Promise<boolean> {
     return true;

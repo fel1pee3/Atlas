@@ -25,7 +25,7 @@ type StoredTokens = {
  */
 export class GoogleCalendarConnector implements CalendarConnector {
   readonly id = 'google_calendar' as const;
-  readonly label = 'Google Calendar';
+  readonly label = 'Google Agenda';
 
   private clientId(): string {
     // Auth Session on Android typically uses the Web client ID with custom scheme PKCE.

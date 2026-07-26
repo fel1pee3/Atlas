@@ -109,7 +109,7 @@ export class SearchUseCase {
           kind: 'event',
           id: ev.id,
           score: hit.similarity,
-          title: ev.type,
+          title: eventTitle(ev.type, payload),
           snippet: snippetFromPayload(ev.type, payload),
           type: ev.type,
           occurredAt: ev.occurredAt.toISOString(),
@@ -164,15 +164,18 @@ export class SearchUseCase {
     `;
 
     const items: SearchResultItem[] = [
-      ...events.map((ev) => ({
-        kind: 'event' as const,
-        id: ev.id,
-        score: 0.5,
-        title: ev.type,
-        snippet: snippetFromPayload(ev.type, ev.payload as Record<string, unknown>),
-        type: ev.type,
-        occurredAt: new Date(ev.occurred_at).toISOString(),
-      })),
+      ...events.map((ev) => {
+        const payload = ev.payload as Record<string, unknown>;
+        return {
+          kind: 'event' as const,
+          id: ev.id,
+          score: 0.5,
+          title: eventTitle(ev.type, payload),
+          snippet: snippetFromPayload(ev.type, payload),
+          type: ev.type,
+          occurredAt: new Date(ev.occurred_at).toISOString(),
+        };
+      }),
       ...insights.map((ins) => ({
         kind: 'insight' as const,
         id: ins.id,
@@ -187,12 +190,63 @@ export class SearchUseCase {
   }
 }
 
+function eventKindLabel(type: string): string {
+  switch (type) {
+    case 'manual.note':
+      return 'Nota';
+    case 'manual.mood':
+      return 'Humor';
+    case 'manual.expense':
+      return 'Gasto';
+    case 'sleep.recorded':
+      return 'Sono';
+    case 'activity.steps':
+      return 'Passos';
+    case 'activity.workout':
+      return 'Treino';
+    case 'location.visited':
+      return 'Visita';
+    case 'calendar.event':
+      return 'Agenda';
+    default:
+      return 'Registro';
+  }
+}
+
+function eventTitle(type: string, payload: Record<string, unknown>): string {
+  const snippet = snippetFromPayload(type, payload).trim();
+  return snippet || eventKindLabel(type);
+}
+
 function snippetFromPayload(type: string, payload: Record<string, unknown>): string {
   if (type === 'manual.note') return String(payload.text ?? '').slice(0, 240);
-  if (type === 'calendar.event') return String(payload.title ?? '').slice(0, 240);
-  if (type === 'location.visited') return String(payload.label ?? type).slice(0, 240);
-  if (type === 'manual.mood' && payload.note) return String(payload.note).slice(0, 240);
-  return JSON.stringify(payload).slice(0, 240);
+  if (type === 'calendar.event') return String(payload.title ?? 'Evento').slice(0, 240);
+  if (type === 'location.visited') return String(payload.label ?? 'Fora de casa').slice(0, 240);
+  if (type === 'manual.mood') {
+    const score = payload.score != null ? `${payload.score}/5` : 'Humor';
+    const note = typeof payload.note === 'string' && payload.note.trim() ? payload.note.trim() : null;
+    return (note ? `${score} · ${note}` : score).slice(0, 240);
+  }
+  if (type === 'manual.expense') {
+    const amount = Number(payload.amount);
+    const money = Number.isFinite(amount)
+      ? `R$ ${amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : 'Gasto';
+    const note = typeof payload.note === 'string' && payload.note.trim() ? payload.note.trim() : null;
+    return (note ? `${money} · ${note}` : money).slice(0, 240);
+  }
+  if (type === 'activity.steps' && payload.steps != null) {
+    return `${Number(payload.steps).toLocaleString('pt-BR')} passos`.slice(0, 240);
+  }
+  if (type === 'sleep.recorded' && payload.durationMin != null) {
+    const min = Number(payload.durationMin);
+    if (Number.isFinite(min)) {
+      return `${Math.floor(min / 60)}h${String(min % 60).padStart(2, '0')}`.slice(0, 240);
+    }
+  }
+  const fallback = payload.title ?? payload.text ?? payload.note ?? payload.label;
+  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim().slice(0, 240);
+  return eventKindLabel(type);
 }
 
 function escapeLike(value: string): string {

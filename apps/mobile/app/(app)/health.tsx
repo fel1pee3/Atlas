@@ -1,13 +1,5 @@
 import { useCallback, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { HealthConnector } from '../../src/features/health/health.connector';
 import {
@@ -21,7 +13,16 @@ import {
   getActiveConnectorId,
   syncHealthNow,
 } from '../../src/features/health/health.service';
-import { colors, spacing, radius, font } from '../../src/theme';
+import { colors, spacing } from '../../src/theme';
+import {
+  Screen,
+  Caption,
+  Button,
+  PageHeader,
+  EntryRow,
+  Hairline,
+  pagePad,
+} from '../../src/ui';
 
 /**
  * Conector de saúde (docs/08 §9–§10, docs/20 M2).
@@ -52,18 +53,18 @@ export default function HealthScreen() {
       Alert.alert(
         'Fonte indisponível',
         connector.id === 'demo'
-          ? 'Demo só aparece em builds de desenvolvimento.'
+          ? 'A demo só aparece em versões de desenvolvimento.'
           : connector.id === 'health_connect'
-            ? 'Instale o Health Connect e abra o Atlas pelo development build (não Expo Go).'
-            : `${connector.label} ainda não está disponível neste dispositivo.`,
+            ? 'Instale o app Health Connect e abra o Atlas pela versão de desenvolvimento (não pelo Expo Go).'
+            : `${connectorLabel(connector)} ainda não está disponível neste aparelho.`,
       );
       return;
     }
 
     const message =
       connector.id === 'demo'
-        ? 'Modo Demo: dados sintéticos só para desenvolvimento local.'
-        : 'O Atlas lê sono e passos reais do Health Connect para montar sua timeline e insights privados.';
+        ? 'Demo: dados de exemplo só para testar o app no desenvolvimento.'
+        : 'O Atlas lê sono e passos do Health Connect para montar sua timeline e insights. Os dados ficam privados.';
 
     Alert.alert('Conectar saúde', message, [
       { text: 'Cancelar', style: 'cancel' },
@@ -79,10 +80,17 @@ export default function HealthScreen() {
                 return;
               }
               const result = await syncHealthNow(connector);
-              setLastImport(`${result.imported} eventos importados`);
+              setLastImport(
+                result.imported === 1
+                  ? '1 registro importado'
+                  : `${result.imported} registros importados`,
+              );
               await refresh();
             } catch (err) {
-              Alert.alert('Falha na sync', err instanceof Error ? err.message : 'Erro desconhecido');
+              Alert.alert(
+                'Não foi possível atualizar',
+                err instanceof Error ? err.message : 'Tente de novo em instantes.',
+              );
             } finally {
               setBusy(false);
             }
@@ -98,10 +106,17 @@ export default function HealthScreen() {
       const connector =
         connectors.find((c) => c.id === activeId) ?? resolveHealthConnector();
       const result = await syncHealthNow(connector);
-      setLastImport(`${result.imported} novos eventos`);
+      setLastImport(
+        result.imported === 1
+          ? '1 registro novo'
+          : `${result.imported} registros novos`,
+      );
       await refresh();
     } catch (err) {
-      Alert.alert('Falha na sync', err instanceof Error ? err.message : 'Erro desconhecido');
+      Alert.alert(
+        'Não foi possível atualizar',
+        err instanceof Error ? err.message : 'Tente de novo em instantes.',
+      );
     } finally {
       setBusy(false);
     }
@@ -113,94 +128,81 @@ export default function HealthScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Saúde</Text>
-      <Text style={styles.lead}>
-        Conecte Health Connect para importar sono e passos reais. Use um development build (não
-        Expo Go).
-      </Text>
+    <Screen padded={false} safe={false}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <PageHeader
+          title="Saúde"
+          lead="Importe sono e passos do Health Connect para preencher a timeline."
+        />
 
-      {connectors.map((c) => (
-        <View key={c.id} style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>{c.label}</Text>
-            {activeId === c.id && enabled ? (
-              <Text style={styles.badge}>ativo</Text>
-            ) : null}
+        {connectors.map((c, index) => (
+          <View key={c.id}>
+            {index > 0 ? <Hairline /> : null}
+            <EntryRow
+              kind={c.id === 'demo' ? 'Demo' : 'Sono e passos'}
+              meta={
+                c.id === 'demo'
+                  ? 'dados de exemplo'
+                  : c.id === 'health_connect'
+                    ? 'Android'
+                    : c.id === 'healthkit'
+                      ? 'iPhone'
+                      : undefined
+              }
+              trailing={activeId === c.id && enabled ? 'ativo' : undefined}
+            >
+              <Caption style={styles.connectorName}>{connectorLabel(c)}</Caption>
+              <Button
+                label={activeId === c.id && enabled ? 'Atualizar' : 'Conectar'}
+                onPress={() => void onConnect(c)}
+                busy={busy}
+                style={styles.actionBtn}
+              />
+            </EntryRow>
           </View>
-          <Text style={styles.cardMeta}>
-            id: {c.id}
-            {c.id === 'demo' ? ' · somente __DEV__' : ''}
-          </Text>
-          <Pressable
-            style={[styles.button, busy && styles.buttonDisabled]}
-            disabled={busy}
-            onPress={() => void onConnect(c)}
-          >
-            <Text style={styles.buttonText}>
-              {activeId === c.id && enabled ? 'Reconectar / atualizar' : 'Conectar'}
-            </Text>
-          </Pressable>
-        </View>
-      ))}
+        ))}
 
-      {enabled ? (
-        <View style={styles.actions}>
-          <Pressable
-            style={[styles.buttonSecondary, busy && styles.buttonDisabled]}
-            disabled={busy}
-            onPress={() => void onSync()}
-          >
-            <Text style={styles.buttonSecondaryText}>Sincronizar agora</Text>
-          </Pressable>
-          <Pressable style={styles.link} onPress={() => void onDisable()} disabled={busy}>
-            <Text style={styles.linkText}>Desativar conector</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        {enabled ? (
+          <View style={styles.actions}>
+            <Hairline />
+            <Button
+              variant="secondary"
+              label="Atualizar agora"
+              onPress={() => void onSync()}
+              disabled={busy}
+              style={styles.actionBtn}
+            />
+            <Button
+              variant="ghost"
+              label="Desconectar"
+              onPress={() => void onDisable()}
+              disabled={busy}
+            />
+          </View>
+        ) : null}
 
-      {busy ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} /> : null}
-      {lastImport ? <Text style={styles.footer}>{lastImport}</Text> : null}
-    </ScrollView>
+        {busy ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} /> : null}
+        {lastImport ? <Caption style={styles.footer}>{lastImport}</Caption> : null}
+      </ScrollView>
+    </Screen>
   );
 }
 
+function connectorLabel(c: HealthConnector): string {
+  if (c.id === 'demo') return 'Demo (só desenvolvimento)';
+  if (c.id === 'health_connect') return 'Health Connect';
+  if (c.id === 'healthkit') return 'Apple Saúde';
+  return c.label;
+}
+
 const styles = StyleSheet.create({
-  container: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl },
-  title: { color: colors.text, fontSize: font.size.xl, fontWeight: font.weight.semibold },
-  lead: { color: colors.textMuted, fontSize: font.size.md, lineHeight: 22 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.sm,
+  container: { ...pagePad },
+  connectorName: {
+    marginTop: 2,
+    marginBottom: spacing.sm,
+    color: colors.text,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardTitle: { color: colors.text, fontSize: font.size.lg, fontWeight: font.weight.semibold },
-  badge: { color: colors.success, fontSize: font.size.sm },
-  cardMeta: { color: colors.textMuted, fontSize: font.size.sm },
-  button: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: colors.primaryText, fontWeight: font.weight.semibold },
-  actions: { gap: spacing.sm, marginTop: spacing.sm },
-  buttonSecondary: {
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  buttonSecondaryText: { color: colors.text, fontWeight: font.weight.medium },
-  link: { alignItems: 'center', padding: spacing.sm },
-  linkText: { color: colors.textMuted },
-  footer: { color: colors.textMuted, fontSize: font.size.sm, textAlign: 'center' },
+  actions: { marginTop: spacing.md, gap: spacing.sm },
+  actionBtn: { marginTop: spacing.sm },
+  footer: { marginTop: spacing.md },
 });
