@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { LocationConnector } from '../../src/features/location/location.connector';
-import { DemoLocationConnector } from '../../src/features/location/demo.connector';
-import { listLocationConnectors } from '../../src/features/location/resolve-connector';
+import {
+  listLocationConnectors,
+  resolveLocationConnector,
+} from '../../src/features/location/resolve-connector';
 import {
   enableLocation,
   disableLocation,
@@ -20,8 +22,10 @@ import {
   syncLocationNow,
 } from '../../src/features/location/location.service';
 import type { CalendarConnector } from '../../src/features/calendar/calendar.connector';
-import { DemoCalendarConnector } from '../../src/features/calendar/demo.connector';
-import { listCalendarConnectors } from '../../src/features/calendar/resolve-connector';
+import {
+  listCalendarConnectors,
+  resolveCalendarConnector,
+} from '../../src/features/calendar/resolve-connector';
 import {
   enableCalendar,
   disableCalendar,
@@ -33,7 +37,7 @@ import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
  * Fontes M4: Location + Calendar (docs/20 §5, docs/08 §10).
- * Demo no Expo Go; nativo/OAuth como stubs até dev client.
+ * Dados reais via expo-location + Google Calendar OAuth.
  */
 export default function SourcesScreen() {
   const [locConnectors, setLocConnectors] = useState<LocationConnector[]>([]);
@@ -87,18 +91,19 @@ export default function SourcesScreen() {
   }
 
   function onConnectLocation(c: LocationConnector) {
-    if (!c) return;
     void (async () => {
       if (!(await c.isAvailable())) {
         Alert.alert(
-          'Requer development build',
-          'Localização nativa não roda no Expo Go. Use o Demo.',
+          'Fonte indisponível',
+          'Localização nativa requer development build com expo-location.',
         );
         return;
       }
       primingThen(
         'Conectar localização',
-        'O Atlas registra visitas (lugares), não um rastro contínuo de GPS. No Demo os dados são sintéticos.',
+        c.id === 'demo'
+          ? 'Demo: visitas sintéticas só para desenvolvimento.'
+          : 'O Atlas registra visitas (lugares), não um rastro contínuo de GPS.',
         async () => {
           const { granted } = await enableLocation(c);
           if (!granted) {
@@ -106,7 +111,7 @@ export default function SourcesScreen() {
             return;
           }
           const r = await syncLocationNow(c);
-          setStatus(`Local: ${r.imported} importados · ${r.pushed} enviados`);
+          setStatus(`Local: ${r.imported} importados`);
         },
       );
     })();
@@ -116,14 +121,18 @@ export default function SourcesScreen() {
     void (async () => {
       if (!(await c.isAvailable())) {
         Alert.alert(
-          'Requer OAuth / build nativo',
-          `${c.label} ainda não está ligado. Use o Demo para dogfooding.`,
+          'Google Calendar não configurado',
+          c.id === 'google_calendar'
+            ? 'Defina googleWebClientId (e googleAndroidClientId) em apps/mobile/app.json → extra, com OAuth no Google Cloud (redirect atlas://).'
+            : `${c.label} ainda não está ligado neste build.`,
         );
         return;
       }
       primingThen(
         'Conectar agenda',
-        'O Atlas lê eventos da agenda para dar semântica ao tempo. No Demo os dados são sintéticos.',
+        c.id === 'demo'
+          ? 'Demo: agenda sintética só para desenvolvimento.'
+          : 'O Atlas lê eventos da agenda (Google) para dar semântica ao tempo.',
         async () => {
           const { granted } = await enableCalendar(c);
           if (!granted) {
@@ -131,7 +140,7 @@ export default function SourcesScreen() {
             return;
           }
           const r = await syncCalendarNow(c);
-          setStatus(`Agenda: ${r.imported} importados · ${r.pushed} enviados`);
+          setStatus(`Agenda: ${r.imported} importados`);
         },
       );
     })();
@@ -141,8 +150,8 @@ export default function SourcesScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Espaço & agenda</Text>
       <Text style={styles.lead}>
-        Eixos de contexto do M4: onde você esteve e o que estava na agenda. Destrava insights
-        cross-domain no M5.
+        Eixos de contexto: onde você esteve e o que estava na agenda — com dados reais do aparelho
+        e do Google Calendar.
       </Text>
 
       <Text style={styles.section}>Localização</Text>
@@ -152,6 +161,7 @@ export default function SourcesScreen() {
             <Text style={styles.cardTitle}>{c.label}</Text>
             {locActive === c.id && locEnabled ? <Text style={styles.badge}>ativo</Text> : null}
           </View>
+          {c.id === 'demo' ? <Text style={styles.meta}>somente __DEV__</Text> : null}
           <Pressable
             style={[styles.button, busy && styles.disabled]}
             disabled={busy}
@@ -173,9 +183,9 @@ export default function SourcesScreen() {
                 setBusy(true);
                 try {
                   const r = await syncLocationNow(
-                    locConnectors.find((x) => x.id === locActive) ?? new DemoLocationConnector(),
+                    locConnectors.find((x) => x.id === locActive) ?? resolveLocationConnector(),
                   );
-                  setStatus(`Local: ${r.imported} novos · ${r.pushed} enviados`);
+                  setStatus(`Local: ${r.imported} novos`);
                 } finally {
                   setBusy(false);
                 }
@@ -197,6 +207,7 @@ export default function SourcesScreen() {
             <Text style={styles.cardTitle}>{c.label}</Text>
             {calActive === c.id && calEnabled ? <Text style={styles.badge}>ativo</Text> : null}
           </View>
+          {c.id === 'demo' ? <Text style={styles.meta}>somente __DEV__</Text> : null}
           <Pressable
             style={[styles.button, busy && styles.disabled]}
             disabled={busy}
@@ -218,9 +229,9 @@ export default function SourcesScreen() {
                 setBusy(true);
                 try {
                   const r = await syncCalendarNow(
-                    calConnectors.find((x) => x.id === calActive) ?? new DemoCalendarConnector(),
+                    calConnectors.find((x) => x.id === calActive) ?? resolveCalendarConnector(),
                   );
-                  setStatus(`Agenda: ${r.imported} novos · ${r.pushed} enviados`);
+                  setStatus(`Agenda: ${r.imported} novos`);
                 } finally {
                   setBusy(false);
                 }
@@ -262,6 +273,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { color: colors.text, fontSize: font.size.md, fontWeight: font.weight.semibold },
   badge: { color: colors.success, fontSize: font.size.sm },
+  meta: { color: colors.textMuted, fontSize: font.size.sm },
   button: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,

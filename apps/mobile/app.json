@@ -9,22 +9,57 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.atlas.app"
+      "bundleIdentifier": "com.atlas.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "O Atlas registra visitas (lugares) para insights de rotina, sem rastro contínuo de GPS.",
+        "NSCalendarsUsageDescription": "O Atlas lê eventos da agenda para dar semântica ao seu tempo."
+      }
     },
     "android": {
       "package": "com.atlas.app",
-      "edgeToEdgeEnabled": true
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_EXERCISE"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-sqlite",
       "expo-status-bar",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser",
+      "expo-dev-client",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Atlas registra visitas (lugares) para insights de rotina, sem rastro contínuo de GPS."
+        }
+      ],
+      "expo-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36
+          }
+        }
+      ]
     ],
     "extra": {
       "//": "Produção: Railway. Para API local no emulador Android use http://10.0.2.2:3333/api — docs/31_Getting_Started.md",
-      "apiBaseUrl": "https://atlasapi-production-e625.up.railway.app/api"
+      "apiBaseUrl": "https://atlasapi-production-e625.up.railway.app/api",
+      "googleAndroidClientId": "",
+      "googleWebClientId": "",
+      "router": {},
+      "eas": {
+        "projectId": "498eade3-db96-42b9-ab2e-26b5efede524"
+      }
     }
   }
 }

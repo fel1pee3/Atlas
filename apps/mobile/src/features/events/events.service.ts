@@ -1,5 +1,6 @@
 import * as Crypto from 'expo-crypto';
 import { desc, eq } from 'drizzle-orm';
+import { EVENT_SOURCES } from '@atlas/shared';
 import { getDb } from '../../db/client';
 import { events, type LocalEvent } from '../../db/schema';
 import { api } from '../../lib/api';
@@ -128,4 +129,17 @@ export async function pushPendingBatch(): Promise<number> {
     }
   }
   return sent;
+}
+
+/** Remove eventos locais com source=demo (dados fictícios do Expo Go). */
+export async function purgeDemoLocalEvents(): Promise<number> {
+  const db = getDb();
+  const rows = await db
+    .select({ id: events.id })
+    .from(events)
+    .where(eq(events.source, EVENT_SOURCES.DEMO));
+  for (const row of rows) {
+    await db.delete(events).where(eq(events.id, row.id));
+  }
+  return rows.length;
 }

@@ -20,7 +20,9 @@ export class OAuthCalendarConnectorStub implements CalendarConnector {
 
   async pullSince(_since: string, _until?: string): Promise<CalendarPullResult> {
     throw new Error(
-      `${this.label} requer OAuth (development build). Use Demo no Expo Go. Ver docs/20 M4.`,
+      this.id === 'google_calendar'
+        ? 'Use GoogleCalendarConnector com googleWebClientId configurado.'
+        : `${this.label} (Apple) ainda não está implementado. Use Google Calendar no Android.`,
     );
   }
 }

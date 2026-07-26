@@ -18,7 +18,7 @@ export class NativeLocationConnectorStub implements LocationConnector {
 
   async pullSince(_since: string, _until?: string): Promise<LocationPullResult> {
     throw new Error(
-      'Localização nativa requer development build + expo-location. Use Demo no Expo Go.',
+      'Este stub foi substituído por DeviceLocationConnector (expo-location).',
     );
   }
 }

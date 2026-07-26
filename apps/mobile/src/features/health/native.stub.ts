@@ -22,8 +22,8 @@ export class NativeHealthConnectorStub implements HealthConnector {
 
   async pullSince(_since: string, _until?: string): Promise<HealthPullResult> {
     throw new Error(
-      `${this.label} requer um development build (expo-dev-client). ` +
-        'No Expo Go use o conector Demo. Ver docs/08 §10.3 e docs/31.',
+      `${this.label} ainda não está implementado neste build. ` +
+        'No Android use Health Connect. Ver docs/08 §10.3.',
     );
   }
 }

@@ -1,31 +1,40 @@
 import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { DemoHealthConnector } from '../../src/features/health/demo.connector';
+import { resolveHealthConnector } from '../../src/features/health/resolve-connector';
 import { enableHealth, syncHealthNow } from '../../src/features/health/health.service';
 import { syncNow } from '../../src/features/sync/sync.service';
 import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
- * Conectar 1 fonte densa — Demo Saúde no Expo Go (docs/20 §2.7).
+ * Conectar 1 fonte densa — Health Connect no Android (docs/20 §2.7).
  */
 export default function OnboardingConnect() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  const connectDemo = async () => {
+  const connectHealth = async () => {
     setBusy(true);
     try {
-      const connector = new DemoHealthConnector();
+      const connector = resolveHealthConnector();
+      const available = await connector.isAvailable();
+      if (!available) {
+        Alert.alert(
+          'Fonte indisponível',
+          connector.id === 'health_connect'
+            ? 'Instale o Health Connect e abra o Atlas pelo development build (não Expo Go).'
+            : `${connector.label} ainda não está disponível neste dispositivo.`,
+        );
+        return;
+      }
       const { granted } = await enableHealth(connector);
       if (!granted) {
-        Alert.alert('Permissão', 'Não foi possível ativar o Demo de saúde.');
+        Alert.alert('Permissão', 'Não foi possível ativar a fonte de saúde.');
         return;
       }
       const { imported } = await syncHealthNow(connector);
-      // Sync remoto em background (syncHealthNow já dispara push). Não bloquear o aha.
       void syncNow().catch(() => undefined);
-      Alert.alert('Fonte conectada', `${imported} amostras Demo importadas.`);
+      Alert.alert('Fonte conectada', `${imported} amostras importadas de ${connector.label}.`);
       router.push('/(onboarding)/aha');
     } catch (err) {
       Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao conectar');
@@ -38,15 +47,15 @@ export default function OnboardingConnect() {
     <View style={styles.container}>
       <Text style={styles.title}>Conecte uma fonte</Text>
       <Text style={styles.body}>
-        No Expo Go usamos o Demo de Saúde: ~30 dias de sono e atividade sintéticos para você
-        ver a timeline e o primeiro insight agora.
+        Conecte o Health Connect para importar sono e passos reais (~30 dias) e ver a timeline e o
+        primeiro insight com a sua vida — não com dados fictícios.
       </Text>
 
-      <Pressable style={styles.primary} onPress={() => void connectDemo()} disabled={busy}>
+      <Pressable style={styles.primary} onPress={() => void connectHealth()} disabled={busy}>
         {busy ? (
           <ActivityIndicator color={colors.primaryText} />
         ) : (
-          <Text style={styles.primaryText}>Conectar Demo Saúde</Text>
+          <Text style={styles.primaryText}>Conectar Health Connect</Text>
         )}
       </Pressable>
     </View>

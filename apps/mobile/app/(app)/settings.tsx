@@ -13,6 +13,10 @@ import {
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/state/auth.store';
 import { deleteAccountAndWipe, exportAndShare } from '../../src/features/privacy/privacy.service';
+import { purgeDemoLocalEvents } from '../../src/features/events/events.service';
+import { disableHealth } from '../../src/features/health/health.service';
+import { disableLocation } from '../../src/features/location/location.service';
+import { disableCalendar } from '../../src/features/calendar/calendar.service';
 import {
   loadDogfoodSnapshot,
   type DogfoodSnapshot,
@@ -26,7 +30,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const logout = useAuth((s) => s.logout);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
+  const [busy, setBusy] = useState<'export' | 'delete' | 'purgeDemo' | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [dogfood, setDogfood] = useState<DogfoodSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -134,11 +138,60 @@ export default function SettingsScreen() {
         <ActivityIndicator color={colors.primary} />
       )}
 
+      <Text style={styles.section}>Dados reais</Text>
+      <Text style={styles.hint}>
+        Remove do aparelho eventos com source=demo e desativa conectores demo, para validar só
+        Health / GPS / Calendar reais.
+      </Text>
+      <Pressable
+        style={styles.btn}
+        disabled={busy !== null}
+        onPress={() => {
+          Alert.alert(
+            'Limpar dados Demo?',
+            'Apaga só eventos locais sintéticos (source=demo) e desativa fontes. Eventos reais e a conta no servidor ficam.',
+            [
+              { text: 'Cancelar', style: 'cancel' },
+              {
+                text: 'Limpar Demo',
+                style: 'destructive',
+                onPress: () => {
+                  void (async () => {
+                    setBusy('purgeDemo');
+                    try {
+                      const removed = await purgeDemoLocalEvents();
+                      await disableHealth();
+                      await disableLocation();
+                      await disableCalendar();
+                      Alert.alert('Pronto', `${removed} eventos Demo removidos do aparelho.`);
+                      await loadDogfood();
+                    } catch (err) {
+                      Alert.alert(
+                        'Falha',
+                        err instanceof Error ? err.message : 'Erro ao limpar Demo',
+                      );
+                    } finally {
+                      setBusy(null);
+                    }
+                  })();
+                },
+              },
+            ],
+          );
+        }}
+      >
+        {busy === 'purgeDemo' ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Text style={styles.btnText}>Limpar dados Demo locais</Text>
+        )}
+      </Pressable>
+
       <Text style={styles.section}>Portabilidade</Text>
       <Pressable
         style={[styles.btn, styles.btnPrimary]}
         onPress={() => void onExport()}
-        disabled={busy === 'export' || busy === 'delete'}
+        disabled={busy !== null}
       >
         {busy === 'export' ? (
           <ActivityIndicator color={colors.primaryText} />
@@ -160,7 +213,7 @@ export default function SettingsScreen() {
       <Pressable
         style={[styles.btn, styles.btnDanger]}
         onPress={onDelete}
-        disabled={busy === 'export' || busy === 'delete'}
+        disabled={busy !== null}
       >
         {busy === 'delete' ? (
           <ActivityIndicator color={colors.primaryText} />
@@ -181,7 +234,7 @@ export default function SettingsScreen() {
             router.replace('/login');
           })();
         }}
-        disabled={busy === 'delete' || loggingOut}
+        disabled={busy !== null || loggingOut}
       >
         {loggingOut ? (
           <ActivityIndicator color={colors.primary} />

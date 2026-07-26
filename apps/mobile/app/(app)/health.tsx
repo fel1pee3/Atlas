@@ -10,8 +10,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { HealthConnector } from '../../src/features/health/health.connector';
-import { DemoHealthConnector } from '../../src/features/health/demo.connector';
-import { listHealthConnectors } from '../../src/features/health/resolve-connector';
+import {
+  listHealthConnectors,
+  resolveHealthConnector,
+} from '../../src/features/health/resolve-connector';
 import {
   enableHealth,
   disableHealth,
@@ -23,7 +25,7 @@ import { colors, spacing, radius, font } from '../../src/theme';
 
 /**
  * Conector de saúde (docs/08 §9–§10, docs/20 M2).
- * JIT priming antes de "conectar"; Demo no Expo Go; nativo quando houver dev client.
+ * Health Connect no development build; Demo só em __DEV__.
  */
 export default function HealthScreen() {
   const [connectors, setConnectors] = useState<HealthConnector[]>([]);
@@ -48,52 +50,55 @@ export default function HealthScreen() {
     const available = await connector.isAvailable();
     if (!available) {
       Alert.alert(
-        'Requer development build',
-        `${connector.label} não roda no Expo Go. Use o conector Demo para dogfooding, ou gere um dev client (docs/08 §10.3).`,
+        'Fonte indisponível',
+        connector.id === 'demo'
+          ? 'Demo só aparece em builds de desenvolvimento.'
+          : connector.id === 'health_connect'
+            ? 'Instale o Health Connect e abra o Atlas pelo development build (não Expo Go).'
+            : `${connector.label} ainda não está disponível neste dispositivo.`,
       );
       return;
     }
 
-    Alert.alert(
-      'Conectar saúde',
-      'O Atlas lê sono e passos para montar sua timeline e insights privados. No modo Demo, os dados são sintéticos e ficam só no seu ambiente local/servidor de desenvolvimento.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar',
-          onPress: () => {
-            void (async () => {
-              setBusy(true);
-              try {
-                const { granted } = await enableHealth(connector);
-                if (!granted) {
-                  Alert.alert('Permissão negada', 'Nada foi alterado.');
-                  return;
-                }
-                const result = await syncHealthNow(connector);
-                setLastImport(
-                  `${result.imported} eventos importados · ${result.pushed} enviados`,
-                );
-                await refresh();
-              } catch (err) {
-                Alert.alert('Falha na sync', err instanceof Error ? err.message : 'Erro desconhecido');
-              } finally {
-                setBusy(false);
+    const message =
+      connector.id === 'demo'
+        ? 'Modo Demo: dados sintéticos só para desenvolvimento local.'
+        : 'O Atlas lê sono e passos reais do Health Connect para montar sua timeline e insights privados.';
+
+    Alert.alert('Conectar saúde', message, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Continuar',
+        onPress: () => {
+          void (async () => {
+            setBusy(true);
+            try {
+              const { granted } = await enableHealth(connector);
+              if (!granted) {
+                Alert.alert('Permissão negada', 'Nada foi alterado.');
+                return;
               }
-            })();
-          },
+              const result = await syncHealthNow(connector);
+              setLastImport(`${result.imported} eventos importados`);
+              await refresh();
+            } catch (err) {
+              Alert.alert('Falha na sync', err instanceof Error ? err.message : 'Erro desconhecido');
+            } finally {
+              setBusy(false);
+            }
+          })();
         },
-      ],
-    );
+      },
+    ]);
   }
 
   async function onSync() {
     setBusy(true);
     try {
       const connector =
-        connectors.find((c) => c.id === activeId) ?? new DemoHealthConnector();
+        connectors.find((c) => c.id === activeId) ?? resolveHealthConnector();
       const result = await syncHealthNow(connector);
-      setLastImport(`${result.imported} novos · ${result.pushed} enviados`);
+      setLastImport(`${result.imported} novos eventos`);
       await refresh();
     } catch (err) {
       Alert.alert('Falha na sync', err instanceof Error ? err.message : 'Erro desconhecido');
@@ -111,8 +116,8 @@ export default function HealthScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Saúde</Text>
       <Text style={styles.lead}>
-        Conecte uma fonte densa (sono + passos). No Expo Go use Demo; Health Connect / HealthKit
-        entram com development build.
+        Conecte Health Connect para importar sono e passos reais. Use um development build (não
+        Expo Go).
       </Text>
 
       {connectors.map((c) => (
@@ -123,7 +128,10 @@ export default function HealthScreen() {
               <Text style={styles.badge}>ativo</Text>
             ) : null}
           </View>
-          <Text style={styles.cardMeta}>id: {c.id}</Text>
+          <Text style={styles.cardMeta}>
+            id: {c.id}
+            {c.id === 'demo' ? ' · somente __DEV__' : ''}
+          </Text>
           <Pressable
             style={[styles.button, busy && styles.buttonDisabled]}
             disabled={busy}

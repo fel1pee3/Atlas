@@ -1,15 +1,22 @@
+import { Platform } from 'react-native';
 import type { CalendarConnector } from './calendar.connector';
 import { DemoCalendarConnector } from './demo.connector';
+import { GoogleCalendarConnector } from './google-calendar.connector';
 import { OAuthCalendarConnectorStub } from './oauth.stub';
+import { isDemoConnectorAllowed } from '../connectors/demo-gate';
 
 export function resolveCalendarConnector(): CalendarConnector {
-  return new DemoCalendarConnector();
+  const google = new GoogleCalendarConnector();
+  return google;
 }
 
 export function listCalendarConnectors(): CalendarConnector[] {
-  return [
-    new DemoCalendarConnector(),
-    new OAuthCalendarConnectorStub('google_calendar', 'Google Calendar'),
-    new OAuthCalendarConnectorStub('apple_calendar', 'Apple Calendar'),
-  ];
+  const out: CalendarConnector[] = [new GoogleCalendarConnector()];
+  if (Platform.OS === 'ios') {
+    out.push(new OAuthCalendarConnectorStub('apple_calendar', 'Apple Calendar'));
+  }
+  if (isDemoConnectorAllowed()) {
+    out.push(new DemoCalendarConnector());
+  }
+  return out;
 }
