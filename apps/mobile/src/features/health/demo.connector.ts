@@ -5,8 +5,6 @@ import type { HealthConnector, HealthPermission, HealthPullResult, HealthSample 
  * Inclui treinos tarde correlacionados com sono mais curto na noite seguinte
  * (para o insight cross-domain ser observável no dogfooding).
  */
-const LOOKBACK_DAYS = 30;
-
 function dayKey(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -78,9 +76,6 @@ export class DemoHealthConnector implements HealthConnector {
   async pullSince(since: string, until?: string): Promise<HealthPullResult> {
     const end = until ? new Date(until) : new Date();
     const start = new Date(since);
-    const floor = new Date(end);
-    floor.setUTCDate(floor.getUTCDate() - LOOKBACK_DAYS);
-    if (start < floor) start.setTime(floor.getTime());
 
     const samples: HealthSample[] = [];
     const cursor = new Date(start);

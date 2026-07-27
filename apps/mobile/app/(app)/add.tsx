@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Pressable, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { EVENT_SOURCES, EVENT_TYPES } from '@atlas/shared';
 import { addEvent } from '../../src/features/events/events.service';
@@ -41,15 +41,17 @@ export default function AddEventScreen() {
   /** Valor do gasto em centavos (máscara começa pelos centavos). */
   const [amountCents, setAmountCents] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   async function save() {
     setBusy(true);
+    setFieldError(null);
     const occurredAt = new Date().toISOString();
     try {
       if (kind === 'note') {
         const trimmed = text.trim();
         if (!trimmed) {
-          Alert.alert('Nota vazia', 'Escreva algo antes de registrar.');
+          setFieldError('Escreva algo antes de registrar.');
           return;
         }
         await addEvent({
@@ -67,7 +69,7 @@ export default function AddEventScreen() {
         });
       } else {
         if (amountCents <= 0) {
-          Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
+          setFieldError('Informe um valor maior que zero.');
           return;
         }
         await addEvent({
@@ -98,6 +100,7 @@ export default function AddEventScreen() {
             style={[styles.tab, kind === k && styles.tabOn]}
             onPress={() => {
               setKind(k);
+              setFieldError(null);
               if (k !== 'expense') setAmountCents(0);
             }}
           >
@@ -113,7 +116,10 @@ export default function AddEventScreen() {
           multiline
           placeholder="O que aconteceu?"
           value={text}
-          onChangeText={setText}
+          onChangeText={(v) => {
+            setText(v);
+            if (fieldError) setFieldError(null);
+          }}
         />
       )}
 
@@ -136,10 +142,19 @@ export default function AddEventScreen() {
           placeholder="R$ 0,00"
           keyboardType="number-pad"
           value={`R$ ${formatCentsBrl(amountCents)}`}
-          onChangeText={(raw) => setAmountCents(centsFromMaskedInput(raw))}
+          onChangeText={(raw) => {
+            setAmountCents(centsFromMaskedInput(raw));
+            if (fieldError) setFieldError(null);
+          }}
           accessibilityLabel="Valor em reais"
         />
       )}
+
+      {fieldError ? (
+        <Caption tone="danger" accessibilityLiveRegion="polite">
+          {fieldError}
+        </Caption>
+      ) : null}
 
       <Button label="Registrar" onPress={() => void save()} busy={busy} style={styles.save} />
     </Screen>

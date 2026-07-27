@@ -5,8 +5,6 @@ import type { LocationConnector, LocationPullResult, LocationSample } from './lo
  * Alguns dias têm >10h fora de casa (para cross mood × location).
  */
 
-const LOOKBACK_DAYS = 30;
-
 const PLACES = [
   { label: 'Casa', lat: -23.5505, lng: -46.6333 },
   { label: 'Trabalho', lat: -23.5614, lng: -46.6559 },
@@ -92,9 +90,6 @@ export class DemoLocationConnector implements LocationConnector {
   async pullSince(since: string, until?: string): Promise<LocationPullResult> {
     const end = until ? new Date(until) : new Date();
     const start = new Date(since);
-    const floor = new Date(end);
-    floor.setUTCDate(floor.getUTCDate() - LOOKBACK_DAYS);
-    if (start < floor) start.setTime(floor.getTime());
 
     const samples: LocationSample[] = [];
     const cursor = new Date(start);

@@ -3,7 +3,7 @@ import { useAuth } from '../../src/state/auth.store';
 import { colors, font } from '../../src/theme';
 import { BootScreen } from '../../src/ui';
 
-/** Fluxo M7 — onboarding < 5 min. */
+/** Fluxo M7 — onboarding < 5 min (bem-vindo → 3 fontes → primeiro insight). */
 export default function OnboardingLayout() {
   const status = useAuth((s) => s.status);
 
@@ -27,6 +27,8 @@ export default function OnboardingLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Bem-vindo' }} />
       <Stack.Screen name="connect" options={{ title: 'Conectar fonte' }} />
+      <Stack.Screen name="connect-calendar" options={{ title: 'Conectar fonte' }} />
+      <Stack.Screen name="connect-location" options={{ title: 'Conectar fonte' }} />
       <Stack.Screen name="aha" options={{ title: 'Primeiro insight' }} />
     </Stack>
   );

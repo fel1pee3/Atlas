@@ -3,17 +3,20 @@ import { EVENT_SOURCES } from '@atlas/shared';
 import { getDb } from '../../db/client';
 import { syncMeta } from '../../db/schema';
 import { addEventLocal, pushPendingBatch } from '../events/events.service';
+import { laterIso, startOfUtcDayIso } from '../sync/connection-day';
 import type { HealthConnector } from './health.connector';
 import { resolveHealthConnector } from './resolve-connector';
 
 /**
  * Orquestra o conector de saúde (docs/08 §10.3, docs/20 M2).
- * Fluxo: permissão → pull histórico → grava local (offline-first) → push batch.
+ * Fluxo: permissão → pull a partir do dia da conexão → grava local → push batch.
+ * Dados já gravados não são apagados; syncs seguintes só avançam o cursor.
  */
 
 const META_CONNECTOR = 'health.connector.id';
 const META_CURSOR = 'health.pull.cursor';
 const META_ENABLED = 'health.enabled';
+const META_CONNECTED_SINCE = 'health.connected.since';
 
 async function getMeta(key: string): Promise<string | undefined> {
   const rows = await getDb().select().from(syncMeta).where(eq(syncMeta.key, key)).limit(1);
@@ -28,6 +31,15 @@ async function setMeta(key: string, value: string): Promise<void> {
   } else {
     await db.insert(syncMeta).values({ key, value });
   }
+}
+
+/** Piso permanente: início do dia UTC da conexão (legado sem meta → hoje). */
+async function ensureConnectedSince(): Promise<string> {
+  const existing = await getMeta(META_CONNECTED_SINCE);
+  if (existing) return existing;
+  const since = startOfUtcDayIso();
+  await setMeta(META_CONNECTED_SINCE, since);
+  return since;
 }
 
 export async function isHealthEnabled(): Promise<boolean> {
@@ -48,11 +60,10 @@ export async function enableHealth(connector: HealthConnector): Promise<{ grante
 
   await setMeta(META_ENABLED, '1');
   await setMeta(META_CONNECTOR, connector.id);
-  // Primeira sync: lookback — cursor inicial = 90 dias atrás (docs/20 M2).
+  const connectedSince = await ensureConnectedSince();
+  // Primeira sync: só a partir do dia da conexão (sem lookback).
   if (!(await getMeta(META_CURSOR))) {
-    const since = new Date();
-    since.setUTCDate(since.getUTCDate() - 30);
-    await setMeta(META_CURSOR, since.toISOString());
+    await setMeta(META_CURSOR, connectedSince);
   }
   return { granted: true };
 }
@@ -77,13 +88,9 @@ export async function syncHealthNow(
   const enabled = await isHealthEnabled();
   if (!enabled) return { imported: 0, pushed: 0 };
 
-  const since =
-    (await getMeta(META_CURSOR)) ??
-    (() => {
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - 30);
-      return d.toISOString();
-    })();
+  const connectedSince = await ensureConnectedSince();
+  const cursor = (await getMeta(META_CURSOR)) ?? connectedSince;
+  const since = laterIso(cursor, connectedSince);
 
   const { samples, nextCursor } = await connector.pullSince(since);
   const source = sourceFor(connector);
@@ -100,7 +107,7 @@ export async function syncHealthNow(
     if (result.inserted) imported += 1;
   }
 
-  await setMeta(META_CURSOR, nextCursor);
+  await setMeta(META_CURSOR, laterIso(nextCursor, since));
   await setMeta(META_CONNECTOR, connector.id);
 
   // Push em background — conectar Demo não deve travar a UI esperando a API.

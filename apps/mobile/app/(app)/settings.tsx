@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Alert, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
+import { StyleSheet, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/state/auth.store';
 import { deleteAccountAndWipe, exportAndShare } from '../../src/features/privacy/privacy.service';
@@ -18,7 +18,10 @@ import {
   Ledger,
   LedgerRow,
   pagePad,
+  AppDialog,
 } from '../../src/ui';
+
+type Notice = { title: string; message: string };
 
 /**
  * Ajustes — export / apagar / resumo de uso (docs/19 §13, M7/M8).
@@ -29,8 +32,11 @@ export default function SettingsScreen() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
   const [confirmText, setConfirmText] = useState('');
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [dogfood, setDogfood] = useState<DogfoodSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const loadDogfood = useCallback(async () => {
     setDogfood(await loadDogfoodSnapshot());
@@ -46,48 +52,45 @@ export default function SettingsScreen() {
     setBusy('export');
     try {
       const { counts } = await exportAndShare();
-      Alert.alert(
-        'Export pronto',
-        `Eventos: ${counts.events ?? 0} · Insights: ${counts.insights ?? 0}`,
-      );
+      setNotice({
+        title: 'Export pronto',
+        message: `Eventos: ${counts.events ?? 0} · Insights: ${counts.insights ?? 0}`,
+      });
     } catch (err) {
-      Alert.alert('Falha no export', err instanceof Error ? err.message : 'Erro desconhecido');
+      setNotice({
+        title: 'Falha no export',
+        message: err instanceof Error ? err.message : 'Erro desconhecido',
+      });
     } finally {
       setBusy(null);
     }
   };
 
-  const onDelete = () => {
+  const onDeletePress = () => {
     if (confirmText.trim().toUpperCase() !== 'APAGAR') {
-      Alert.alert('Confirmação', 'Digite APAGAR para confirmar a exclusão permanente.');
+      setConfirmError('Digite APAGAR para confirmar a exclusão permanente.');
       return;
     }
-    Alert.alert(
-      'Apagar conta?',
-      'Isso remove seus dados no servidor e neste aparelho. Não dá para desfazer.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Apagar tudo',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              setBusy('delete');
-              try {
-                await deleteAccountAndWipe();
-                router.replace('/login');
-              } catch (err) {
-                Alert.alert(
-                  'Falha ao apagar',
-                  err instanceof Error ? err.message : 'Erro desconhecido',
-                );
-                setBusy(null);
-              }
-            })();
-          },
-        },
-      ],
-    );
+    setConfirmError(null);
+    setDeleteOpen(true);
+  };
+
+  const onDeleteConfirm = () => {
+    void (async () => {
+      setBusy('delete');
+      try {
+        await deleteAccountAndWipe();
+        setDeleteOpen(false);
+        router.replace('/login');
+      } catch (err) {
+        setBusy(null);
+        setDeleteOpen(false);
+        setNotice({
+          title: 'Falha ao apagar',
+          message: err instanceof Error ? err.message : 'Erro desconhecido',
+        });
+      }
+    })();
   };
 
   return (
@@ -166,15 +169,23 @@ export default function SettingsScreen() {
         <Caption style={styles.hint}>Digite APAGAR para confirmar.</Caption>
         <TextField
           value={confirmText}
-          onChangeText={setConfirmText}
+          onChangeText={(v) => {
+            setConfirmText(v);
+            if (confirmError) setConfirmError(null);
+          }}
           autoCapitalize="characters"
           placeholder="APAGAR"
           style={styles.field}
         />
+        {confirmError ? (
+          <Caption tone="danger" style={styles.fieldError}>
+            {confirmError}
+          </Caption>
+        ) : null}
         <Button
           variant="danger"
           label="Apagar conta e dados"
-          onPress={onDelete}
+          onPress={onDeletePress}
           busy={busy === 'delete'}
           disabled={busy !== null}
         />
@@ -195,6 +206,28 @@ export default function SettingsScreen() {
           }}
         />
       </ScrollView>
+
+      <AppDialog
+        visible={deleteOpen}
+        title="Apagar conta?"
+        message="Isso remove seus dados no servidor e neste aparelho. Não dá para desfazer."
+        confirmLabel="Apagar tudo"
+        cancelLabel="Cancelar"
+        destructive
+        busy={busy === 'delete'}
+        onConfirm={onDeleteConfirm}
+        onDismiss={() => {
+          if (busy === 'delete') return;
+          setDeleteOpen(false);
+        }}
+      />
+
+      <AppDialog
+        visible={notice != null}
+        title={notice?.title ?? ''}
+        message={notice?.message}
+        onDismiss={() => setNotice(null)}
+      />
     </Screen>
   );
 }
@@ -205,4 +238,5 @@ const styles = StyleSheet.create({
   firstSection: { marginTop: 0, marginBottom: spacing.xs },
   hint: { marginBottom: spacing.sm, lineHeight: 18 },
   field: { marginBottom: spacing.sm },
+  fieldError: { marginBottom: spacing.sm, marginTop: -4 },
 });

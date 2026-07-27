@@ -1,7 +1,5 @@
 import type { CalendarConnector, CalendarPullResult, CalendarSample } from './calendar.connector';
 
-const LOOKBACK_DAYS = 30;
-
 const TITLES = [
   'Stand-up',
   '1:1',
@@ -63,11 +61,10 @@ export class DemoCalendarConnector implements CalendarConnector {
   }
 
   async pullSince(since: string, until?: string): Promise<CalendarPullResult> {
-    const end = until ? new Date(until) : new Date();
+    const end = until
+      ? new Date(until)
+      : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     const start = new Date(since);
-    const floor = new Date(end);
-    floor.setUTCDate(floor.getUTCDate() - LOOKBACK_DAYS);
-    if (start < floor) start.setTime(floor.getTime());
 
     const samples: CalendarSample[] = [];
     const cursor = new Date(start);

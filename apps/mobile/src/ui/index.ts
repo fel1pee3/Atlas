@@ -8,6 +8,9 @@ export { LogoMark, BrandLockup, LOGO_MARK } from './Logo';
 export { BootScreen } from './BootScreen';
 export { HomeMenu } from './HomeMenu';
 export { HomeHeader } from './HomeHeader';
+export { OnboardingHero } from './OnboardingHero';
+export { OnboardingProgress } from './OnboardingProgress';
+export { AppDialog } from './AppDialog';
 export {
   PageHeader,
   SectionTitle,

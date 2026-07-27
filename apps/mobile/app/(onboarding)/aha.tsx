@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, ActivityIndicator } from 'react-native';
+import { StyleSheet, ActivityIndicator, View, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   generateInsights,
@@ -8,12 +8,12 @@ import {
 } from '../../src/features/insights/insights.service';
 import { fetchDailySummary } from '../../src/features/sync/sync.service';
 import { useOnboarding } from '../../src/features/onboarding/onboarding.store';
-import { colors, spacing, font } from '../../src/theme';
+import { colors, spacing, font, shadow } from '../../src/theme';
+import { Screen, Body, Caption, Button } from '../../src/ui';
 import { insightThemeLabel } from '../../src/lib/humanize';
-import { Screen, Title, Body, Caption, Button, EntryRow, Hairline } from '../../src/ui';
 
 /**
- * Primeiro "aha" — insight heurístico ou resumo de sono (docs/20 §2.7).
+ * Primeiro "aha" — visual do protótipo + insight real quando houver.
  */
 export default function OnboardingAha() {
   const router = useRouter();
@@ -63,50 +63,92 @@ export default function OnboardingAha() {
     );
   }
 
+  const cardTitle = insight?.title ?? 'Você está no ar';
+  const cardBody = insight?.body ?? fallback ?? 'Timeline populada. Abra Insights depois para ver padrões.';
+  const eyebrow = insight ? insightThemeLabel(insight.kind) : 'Atlas';
+
   return (
-    <Screen style={styles.container} safe={false}>
-      <Title style={styles.title}>Primeiro insight</Title>
-      <Caption style={styles.lead}>Uma observação a partir dos seus dados</Caption>
+    <Screen padded={false} safe={false}>
+      <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
+        <View style={styles.copy}>
+          <Body style={styles.title}>Primeiro insight</Body>
+          <Caption style={styles.lead}>Uma observação a partir dos seus dados</Caption>
 
-      <Hairline />
-      {insight ? (
-        <EntryRow kind={insightThemeLabel(insight.kind)}>
-          <Body style={styles.itemTitle}>{insight.title}</Body>
-          <Body tone="muted">{insight.body}</Body>
-        </EntryRow>
-      ) : (
-        <EntryRow kind="atlas">
-          <Body style={styles.itemTitle}>Você está no ar</Body>
-          <Body tone="muted">{fallback}</Body>
-          {error ? <Caption tone="danger">{error}</Caption> : null}
-        </EntryRow>
-      )}
-      <Hairline />
+          <View style={styles.card}>
+            <Caption tone="primary" style={styles.eyebrow}>
+              {eyebrow}
+            </Caption>
+            <Body style={styles.cardTitle}>{cardTitle}</Body>
+            <Body tone="muted" style={styles.cardBody}>
+              {cardBody}
+            </Body>
+            {error ? <Caption tone="danger">{error}</Caption> : null}
+          </View>
 
-      <Caption style={styles.hint}>
-        Próximo passo opcional: registre o humor de hoje (+) para semear correlações.
-      </Caption>
+          <Body tone="muted" style={styles.hint}>
+            Próximo passo opcional: registre o humor de hoje (+) para semear correlações.
+          </Body>
 
-      <Button label="Ir para o Atlas" onPress={() => void finish()} />
+          <Button label="Ir para o Atlas" onPress={() => void finish()} style={styles.primaryBtn} />
+        </View>
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   center: { justifyContent: 'center', alignItems: 'center', gap: spacing.md },
-  container: { justifyContent: 'center', paddingVertical: spacing.lg },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
+  },
+  copy: {
+    flexShrink: 0,
+  },
   title: {
-    fontSize: font.size.xxl,
     fontFamily: font.family.serifBold,
-    letterSpacing: -0.5,
-    marginBottom: 4,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -1,
   },
-  lead: { marginBottom: spacing.lg },
-  itemTitle: {
-    fontFamily: font.family.serif,
+  lead: {
+    marginTop: spacing.md,
     fontSize: font.size.lg,
-    letterSpacing: -0.2,
-    marginBottom: 4,
+    lineHeight: 24,
   },
-  hint: { marginTop: spacing.lg, marginBottom: spacing.lg, lineHeight: 20 },
+  card: {
+    marginVertical: spacing.xl,
+    paddingVertical: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  eyebrow: {
+    marginBottom: spacing.sm,
+    fontFamily: font.family.sansSemi,
+    fontSize: font.size.sm,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  cardTitle: {
+    fontFamily: font.family.serifBold,
+    fontSize: font.size.xl,
+    letterSpacing: -0.3,
+    marginBottom: spacing.sm,
+    lineHeight: 30,
+  },
+  cardBody: {
+    fontSize: font.size.lg,
+    lineHeight: 26,
+  },
+  hint: {
+    marginBottom: spacing.xl,
+    fontSize: font.size.lg,
+    lineHeight: 26,
+  },
+  primaryBtn: {
+    ...shadow.card,
+  },
 });

@@ -3,12 +3,14 @@ import { EVENT_SOURCES } from '@atlas/shared';
 import { getDb } from '../../db/client';
 import { syncMeta } from '../../db/schema';
 import { addEventLocal, pushPendingBatch } from '../events/events.service';
+import { startOfUtcDayIso } from '../sync/connection-day';
 import type { CalendarConnector } from './calendar.connector';
 import { resolveCalendarConnector } from './resolve-connector';
 
 const META_ENABLED = 'calendar.enabled';
 const META_CONNECTOR = 'calendar.connector.id';
 const META_CURSOR = 'calendar.pull.cursor';
+const META_CONNECTED_SINCE = 'calendar.connected.since';
 
 async function getMeta(key: string): Promise<string | undefined> {
   const rows = await getDb().select().from(syncMeta).where(eq(syncMeta.key, key)).limit(1);
@@ -23,6 +25,15 @@ async function setMeta(key: string, value: string): Promise<void> {
   } else {
     await db.insert(syncMeta).values({ key, value });
   }
+}
+
+/** Piso permanente: início do dia UTC da conexão (legado sem meta → hoje). */
+async function ensureConnectedSince(): Promise<string> {
+  const existing = await getMeta(META_CONNECTED_SINCE);
+  if (existing) return existing;
+  const since = startOfUtcDayIso();
+  await setMeta(META_CONNECTED_SINCE, since);
+  return since;
 }
 
 export async function isCalendarEnabled(): Promise<boolean> {
@@ -41,10 +52,9 @@ export async function enableCalendar(
   if (!granted) return { granted: false };
   await setMeta(META_ENABLED, '1');
   await setMeta(META_CONNECTOR, connector.id);
+  const connectedSince = await ensureConnectedSince();
   if (!(await getMeta(META_CURSOR))) {
-    const since = new Date();
-    since.setUTCDate(since.getUTCDate() - 30);
-    await setMeta(META_CURSOR, since.toISOString());
+    await setMeta(META_CURSOR, connectedSince);
   }
   return { granted: true };
 }
@@ -70,8 +80,8 @@ export type CalendarSyncResult = {
 };
 
 /**
- * Releia sempre a janela recente (30d atrás → 14d à frente).
- * O cursor antigo apontava para o futuro e fazia o 2º sync ignorar eventos novos.
+ * Relê a janela a partir do dia da conexão → +14d (captura eventos novos/alterados).
+ * Não olha o passado anterior à conexão; eventos já gravados não são apagados.
  */
 export async function syncCalendarNow(
   connector: CalendarConnector = resolveCalendarConnector(),
@@ -80,10 +90,8 @@ export async function syncCalendarNow(
     return { imported: 0, pushed: 0, pulled: 0, titles: [] };
   }
 
-  const windowStart = new Date();
-  windowStart.setUTCDate(windowStart.getUTCDate() - 30);
-
-  const { samples } = await connector.pullSince(windowStart.toISOString());
+  const windowStart = await ensureConnectedSince();
+  const { samples } = await connector.pullSince(windowStart);
   const source = sourceFor(connector);
   let imported = 0;
   for (const sample of samples) {

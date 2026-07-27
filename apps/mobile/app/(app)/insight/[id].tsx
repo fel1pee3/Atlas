@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import {
   getInsight,
@@ -24,6 +24,7 @@ import {
   EntryRow,
   Hairline,
   pagePad,
+  AppDialog,
 } from '../../../src/ui';
 
 /**
@@ -35,6 +36,7 @@ export default function InsightDetailScreen() {
   const [detail, setDetail] = useState<InsightDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<'useful' | 'dismiss' | null>(null);
+  const [notice, setNotice] = useState<{ title: string; message: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -42,7 +44,10 @@ export default function InsightDetailScreen() {
     try {
       setDetail(await getInsight(id));
     } catch (err) {
-      Alert.alert('Erro', err instanceof Error ? err.message : 'Falha ao carregar');
+      setNotice({
+        title: 'Erro',
+        message: err instanceof Error ? err.message : 'Falha ao carregar',
+      });
     } finally {
       setLoading(false);
     }
@@ -62,12 +67,13 @@ export default function InsightDetailScreen() {
       setDetail((prev) => (prev ? { ...prev, status: updated.status } : prev));
 
       if (action === 'dismiss') {
-        Alert.alert('Dispensado', 'Este insight saiu da sua lista.', [
-          { text: 'Ok', onPress: () => router.back() },
-        ]);
+        router.back();
       }
     } catch (err) {
-      Alert.alert('Erro', err instanceof Error ? err.message : 'Falha no feedback');
+      setNotice({
+        title: 'Erro',
+        message: err instanceof Error ? err.message : 'Falha no feedback',
+      });
     } finally {
       setBusy(null);
     }
@@ -86,6 +92,12 @@ export default function InsightDetailScreen() {
       <Screen style={styles.center} safe={false}>
         <Caption>Insight não encontrado.</Caption>
         <Button variant="ghost" label="Tentar de novo" onPress={() => void load()} />
+        <AppDialog
+          visible={notice != null}
+          title={notice?.title ?? ''}
+          message={notice?.message}
+          onDismiss={() => setNotice(null)}
+        />
       </Screen>
     );
   }
@@ -159,13 +171,17 @@ export default function InsightDetailScreen() {
               onPress={() => void feedback('dismiss')}
             />
           ) : (
-            <Button
-              label="Voltar à lista"
-              onPress={() => router.back()}
-            />
+            <Button label="Voltar à lista" onPress={() => router.back()} />
           )}
         </View>
       </ScrollView>
+
+      <AppDialog
+        visible={notice != null}
+        title={notice?.title ?? ''}
+        message={notice?.message}
+        onDismiss={() => setNotice(null)}
+      />
     </Screen>
   );
 }

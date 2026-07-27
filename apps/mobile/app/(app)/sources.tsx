@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { LocationConnector } from '../../src/features/location/location.connector';
 import {
@@ -34,6 +34,7 @@ import {
   EntryRow,
   Hairline,
   pagePad,
+  AppDialog,
 } from '../../src/ui';
 
 type BusyKey =
@@ -44,8 +45,11 @@ type BusyKey =
   | 'cal:sync'
   | 'cal:disable';
 
+type Notice = { title: string; message: string };
+
 /**
  * Fontes M4: Location + Calendar (docs/20 §5, docs/08 §10).
+ * Conectar vai direto à permissão do SO — sem priming duplicado do Atlas.
  */
 export default function SourcesScreen() {
   const [locConnectors, setLocConnectors] = useState<LocationConnector[]>([]);
@@ -56,6 +60,7 @@ export default function SourcesScreen() {
   const [calActive, setCalActive] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<BusyKey | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const locked = busyKey !== null;
 
@@ -81,73 +86,50 @@ export default function SourcesScreen() {
         await work();
         await refresh();
       } catch (err) {
-        Alert.alert('Falha', err instanceof Error ? err.message : 'Erro');
+        setNotice({
+          title: 'Falha',
+          message: err instanceof Error ? err.message : 'Erro',
+        });
       } finally {
         setBusyKey(null);
       }
     })();
   }
 
-  function primingThen(
-    title: string,
-    message: string,
-    key: BusyKey,
-    onContinue: () => Promise<void>,
-  ) {
-    Alert.alert(title, message, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Continuar',
-        onPress: () => runBusy(key, onContinue),
-      },
-    ]);
-  }
-
   function onConnectLocation(c: LocationConnector) {
     void (async () => {
       if (!(await c.isAvailable())) {
-        Alert.alert(
-          'Fonte indisponível',
-          'Localização do aparelho precisa da versão de desenvolvimento do Atlas.',
-        );
+        setNotice({
+          title: 'Fonte indisponível',
+          message: 'Localização do aparelho precisa da versão de desenvolvimento do Atlas.',
+        });
         return;
       }
-      primingThen(
-        'Conectar localização',
-        c.id === 'demo'
-          ? 'Demo: visitas de exemplo só para testar no desenvolvimento.'
-          : 'O Atlas registra lugares visitados — não um rastro contínuo de GPS.',
-        `loc:connect:${c.id}`,
-        async () => {
-          const { granted } = await enableLocation(c);
-          if (!granted) {
-            Alert.alert('Permissão negada', 'Nada foi alterado.');
-            return;
-          }
-          const r = await syncLocationNow(c);
-          setStatus(formatLocationStatus(r));
-        },
-      );
+      runBusy(`loc:connect:${c.id}`, async () => {
+        const { granted } = await enableLocation(c);
+        if (!granted) {
+          setStatus('Localização: permissão não concedida.');
+          return;
+        }
+        const r = await syncLocationNow(c);
+        setStatus(formatLocationStatus(r));
+      });
     })();
   }
 
   function onConnectCalendar(c: CalendarConnector) {
     void (async () => {
       if (!(await c.isAvailable())) {
-        Alert.alert(
-          'Agenda indisponível',
-          `${calendarLabel(c)} ainda não está disponível neste aparelho.`,
-        );
+        setNotice({
+          title: 'Agenda indisponível',
+          message: `${calendarLabel(c)} ainda não está disponível neste aparelho.`,
+        });
         return;
       }
-      const message =
-        c.id === 'demo'
-          ? 'Demo: agenda de exemplo só para testar no desenvolvimento.'
-          : 'O Atlas lê os compromissos da agenda do celular e atualiza sozinho ao abrir o app.';
-      primingThen('Conectar agenda', message, `cal:connect:${c.id}`, async () => {
+      runBusy(`cal:connect:${c.id}`, async () => {
         const { granted } = await enableCalendar(c);
         if (!granted) {
-          Alert.alert('Permissão negada', 'Nada foi alterado.');
+          setStatus('Agenda: permissão não concedida.');
           return;
         }
         const r = await syncCalendarNow(c);
@@ -262,6 +244,13 @@ export default function SourcesScreen() {
 
         {status ? <Caption style={styles.footer}>{status}</Caption> : null}
       </ScrollView>
+
+      <AppDialog
+        visible={notice != null}
+        title={notice?.title ?? ''}
+        message={notice?.message}
+        onDismiss={() => setNotice(null)}
+      />
     </Screen>
   );
 }

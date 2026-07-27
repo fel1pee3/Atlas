@@ -3,12 +3,14 @@ import { EVENT_SOURCES } from '@atlas/shared';
 import { getDb } from '../../db/client';
 import { syncMeta } from '../../db/schema';
 import { addEventLocal, pushPendingBatch } from '../events/events.service';
+import { startOfUtcDayIso } from '../sync/connection-day';
 import type { LocationConnector } from './location.connector';
 import { resolveLocationConnector } from './resolve-connector';
 
 const META_ENABLED = 'location.enabled';
 const META_CONNECTOR = 'location.connector.id';
 const META_CURSOR = 'location.pull.cursor';
+const META_CONNECTED_SINCE = 'location.connected.since';
 
 async function getMeta(key: string): Promise<string | undefined> {
   const rows = await getDb().select().from(syncMeta).where(eq(syncMeta.key, key)).limit(1);
@@ -23,6 +25,15 @@ async function setMeta(key: string, value: string): Promise<void> {
   } else {
     await db.insert(syncMeta).values({ key, value });
   }
+}
+
+/** Piso permanente: início do dia UTC da conexão (legado sem meta → hoje). */
+async function ensureConnectedSince(): Promise<string> {
+  const existing = await getMeta(META_CONNECTED_SINCE);
+  if (existing) return existing;
+  const since = startOfUtcDayIso();
+  await setMeta(META_CONNECTED_SINCE, since);
+  return since;
 }
 
 export async function isLocationEnabled(): Promise<boolean> {
@@ -41,10 +52,9 @@ export async function enableLocation(
   if (!granted) return { granted: false };
   await setMeta(META_ENABLED, '1');
   await setMeta(META_CONNECTOR, connector.id);
+  const connectedSince = await ensureConnectedSince();
   if (!(await getMeta(META_CURSOR))) {
-    const since = new Date();
-    since.setUTCDate(since.getUTCDate() - 30);
-    await setMeta(META_CURSOR, since.toISOString());
+    await setMeta(META_CURSOR, connectedSince);
   }
   return { granted: true };
 }
@@ -74,8 +84,8 @@ export async function syncLocationNow(
 ): Promise<LocationSyncResult> {
   if (!(await isLocationEnabled())) return { imported: 0, pushed: 0 };
 
-  // Sempre lê a posição atual (visita pontual). Cursor só registra “última sync”.
-  const since = new Date(0).toISOString();
+  // Device: visita pontual atual. Demo: só a partir do dia da conexão.
+  const since = await ensureConnectedSince();
   const { samples } = await connector.pullSince(since);
   const source = sourceFor(connector);
   let imported = 0;

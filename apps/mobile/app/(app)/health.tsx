@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { HealthConnector } from '../../src/features/health/health.connector';
 import {
@@ -22,13 +22,16 @@ import {
   EntryRow,
   Hairline,
   pagePad,
+  AppDialog,
 } from '../../src/ui';
 
 type BusyKey = `connect:${string}` | 'sync' | 'disable';
 
+type Notice = { title: string; message: string };
+
 /**
  * Conector de saúde (docs/08 §9–§10, docs/20 M2).
- * Health Connect no development build; Demo só em __DEV__.
+ * Conectar vai direto à permissão do SO / Health Connect — sem priming Atlas.
  */
 export default function HealthScreen() {
   const [connectors, setConnectors] = useState<HealthConnector[]>([]);
@@ -36,6 +39,7 @@ export default function HealthScreen() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<BusyKey | null>(null);
   const [lastImport, setLastImport] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const locked = busyKey !== null;
 
@@ -54,56 +58,41 @@ export default function HealthScreen() {
   async function onConnect(connector: HealthConnector) {
     const available = await connector.isAvailable();
     if (!available) {
-      Alert.alert(
-        'Fonte indisponível',
-        connector.id === 'demo'
-          ? 'A demo só aparece em versões de desenvolvimento.'
-          : connector.id === 'health_connect'
-            ? 'Instale o app Health Connect e abra o Atlas pela versão de desenvolvimento (não pelo Expo Go).'
-            : `${connectorLabel(connector)} ainda não está disponível neste aparelho.`,
-      );
+      setNotice({
+        title: 'Fonte indisponível',
+        message:
+          connector.id === 'demo'
+            ? 'A demo só aparece em versões de desenvolvimento.'
+            : connector.id === 'health_connect'
+              ? 'Instale o app Health Connect e abra o Atlas pela versão de desenvolvimento (não pelo Expo Go).'
+              : `${connectorLabel(connector)} ainda não está disponível neste aparelho.`,
+      });
       return;
     }
 
-    const message =
-      connector.id === 'demo'
-        ? 'Demo: dados de exemplo só para testar o app no desenvolvimento.'
-        : 'O Atlas lê sono e passos do Health Connect para montar sua timeline e insights. Os dados ficam privados.';
-
     const key: BusyKey = `connect:${connector.id}`;
-
-    Alert.alert('Conectar saúde', message, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Continuar',
-        onPress: () => {
-          void (async () => {
-            setBusyKey(key);
-            try {
-              const { granted } = await enableHealth(connector);
-              if (!granted) {
-                Alert.alert('Permissão negada', 'Nada foi alterado.');
-                return;
-              }
-              const result = await syncHealthNow(connector);
-              setLastImport(
-                result.imported === 1
-                  ? '1 registro importado'
-                  : `${result.imported} registros importados`,
-              );
-              await refresh();
-            } catch (err) {
-              Alert.alert(
-                'Não foi possível atualizar',
-                err instanceof Error ? err.message : 'Tente de novo em instantes.',
-              );
-            } finally {
-              setBusyKey(null);
-            }
-          })();
-        },
-      },
-    ]);
+    setBusyKey(key);
+    try {
+      const { granted } = await enableHealth(connector);
+      if (!granted) {
+        setLastImport('Permissão não concedida.');
+        return;
+      }
+      const result = await syncHealthNow(connector);
+      setLastImport(
+        result.imported === 1
+          ? '1 registro importado'
+          : `${result.imported} registros importados`,
+      );
+      await refresh();
+    } catch (err) {
+      setNotice({
+        title: 'Não foi possível atualizar',
+        message: err instanceof Error ? err.message : 'Tente de novo em instantes.',
+      });
+    } finally {
+      setBusyKey(null);
+    }
   }
 
   async function onSync() {
@@ -119,10 +108,10 @@ export default function HealthScreen() {
       );
       await refresh();
     } catch (err) {
-      Alert.alert(
-        'Não foi possível atualizar',
-        err instanceof Error ? err.message : 'Tente de novo em instantes.',
-      );
+      setNotice({
+        title: 'Não foi possível atualizar',
+        message: err instanceof Error ? err.message : 'Tente de novo em instantes.',
+      });
     } finally {
       setBusyKey(null);
     }
@@ -200,6 +189,13 @@ export default function HealthScreen() {
 
         {lastImport ? <Caption style={styles.footer}>{lastImport}</Caption> : null}
       </ScrollView>
+
+      <AppDialog
+        visible={notice != null}
+        title={notice?.title ?? ''}
+        message={notice?.message}
+        onDismiss={() => setNotice(null)}
+      />
     </Screen>
   );
 }
