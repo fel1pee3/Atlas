@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useAuth } from '../../src/state/auth.store';
 import { colors, font } from '../../src/theme';
-import { BootScreen, HomeMenu } from '../../src/ui';
+import { BootScreen, HomeHeader } from '../../src/ui';
 
 /**
  * Stack do app logado. Se a sessão caiu, não renderiza as telas
@@ -32,12 +32,12 @@ export default function AppLayout() {
         name="index"
         options={{
           title: 'Atlas',
-          headerRight: () => <HomeMenu />,
+          header: () => <HomeHeader />,
         }}
       />
       <Stack.Screen name="add" options={{ title: 'Registrar', presentation: 'modal' }} />
       <Stack.Screen name="health" options={{ title: 'Saúde' }} />
-      <Stack.Screen name="sources" options={{ title: 'Espaço & agenda' }} />
+      <Stack.Screen name="sources" options={{ title: 'Fontes' }} />
       <Stack.Screen name="insights" options={{ title: 'Insights' }} />
       <Stack.Screen name="insight/[id]" options={{ title: 'Insight' }} />
       <Stack.Screen name="search" options={{ title: 'Busca' }} />

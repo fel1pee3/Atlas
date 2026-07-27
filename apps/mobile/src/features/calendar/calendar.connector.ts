@@ -1,6 +1,6 @@
 /**
  * Porta do conector de calendário (docs/20 M4).
- * Preferência: agenda do aparelho; Google/Apple OAuth opcional; Demo só em __DEV__.
+ * Preferência: agenda do aparelho; Demo só em __DEV__.
  */
 
 export interface CalendarSample {

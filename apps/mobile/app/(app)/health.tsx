@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { HealthConnector } from '../../src/features/health/health.connector';
 import {
@@ -24,6 +24,8 @@ import {
   pagePad,
 } from '../../src/ui';
 
+type BusyKey = `connect:${string}` | 'sync' | 'disable';
+
 /**
  * Conector de saúde (docs/08 §9–§10, docs/20 M2).
  * Health Connect no development build; Demo só em __DEV__.
@@ -32,8 +34,10 @@ export default function HealthScreen() {
   const [connectors, setConnectors] = useState<HealthConnector[]>([]);
   const [enabled, setEnabled] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<BusyKey | null>(null);
   const [lastImport, setLastImport] = useState<string | null>(null);
+
+  const locked = busyKey !== null;
 
   const refresh = useCallback(async () => {
     setConnectors(listHealthConnectors());
@@ -66,13 +70,15 @@ export default function HealthScreen() {
         ? 'Demo: dados de exemplo só para testar o app no desenvolvimento.'
         : 'O Atlas lê sono e passos do Health Connect para montar sua timeline e insights. Os dados ficam privados.';
 
+    const key: BusyKey = `connect:${connector.id}`;
+
     Alert.alert('Conectar saúde', message, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Continuar',
         onPress: () => {
           void (async () => {
-            setBusy(true);
+            setBusyKey(key);
             try {
               const { granted } = await enableHealth(connector);
               if (!granted) {
@@ -92,7 +98,7 @@ export default function HealthScreen() {
                 err instanceof Error ? err.message : 'Tente de novo em instantes.',
               );
             } finally {
-              setBusy(false);
+              setBusyKey(null);
             }
           })();
         },
@@ -101,7 +107,7 @@ export default function HealthScreen() {
   }
 
   async function onSync() {
-    setBusy(true);
+    setBusyKey('sync');
     try {
       const connector =
         connectors.find((c) => c.id === activeId) ?? resolveHealthConnector();
@@ -118,13 +124,18 @@ export default function HealthScreen() {
         err instanceof Error ? err.message : 'Tente de novo em instantes.',
       );
     } finally {
-      setBusy(false);
+      setBusyKey(null);
     }
   }
 
   async function onDisable() {
-    await disableHealth();
-    await refresh();
+    setBusyKey('disable');
+    try {
+      await disableHealth();
+      await refresh();
+    } finally {
+      setBusyKey(null);
+    }
   }
 
   return (
@@ -132,35 +143,39 @@ export default function HealthScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <PageHeader
           title="Saúde"
-          lead="Importe sono e passos do Health Connect para preencher a timeline."
+          lead="Sono e passos do Health Connect. O Atlas atualiza sozinho ao abrir o app."
         />
 
-        {connectors.map((c, index) => (
-          <View key={c.id}>
-            {index > 0 ? <Hairline /> : null}
-            <EntryRow
-              kind={c.id === 'demo' ? 'Demo' : 'Sono e passos'}
-              meta={
-                c.id === 'demo'
-                  ? 'dados de exemplo'
-                  : c.id === 'health_connect'
-                    ? 'Android'
-                    : c.id === 'healthkit'
-                      ? 'iPhone'
-                      : undefined
-              }
-              trailing={activeId === c.id && enabled ? 'ativo' : undefined}
-            >
-              <Caption style={styles.connectorName}>{connectorLabel(c)}</Caption>
-              <Button
-                label={activeId === c.id && enabled ? 'Atualizar' : 'Conectar'}
-                onPress={() => void onConnect(c)}
-                busy={busy}
-                style={styles.actionBtn}
-              />
-            </EntryRow>
-          </View>
-        ))}
+        {connectors.map((c, index) => {
+          const key: BusyKey = `connect:${c.id}`;
+          return (
+            <View key={c.id}>
+              {index > 0 ? <Hairline /> : null}
+              <EntryRow
+                kind={c.id === 'demo' ? 'Demo' : 'Sono e passos'}
+                meta={
+                  c.id === 'demo'
+                    ? 'dados de exemplo'
+                    : c.id === 'health_connect'
+                      ? 'Android'
+                      : c.id === 'healthkit'
+                        ? 'iPhone'
+                        : undefined
+                }
+                trailing={activeId === c.id && enabled ? 'ativo' : undefined}
+              >
+                <Caption style={styles.connectorName}>{connectorLabel(c)}</Caption>
+                <Button
+                  label={activeId === c.id && enabled ? 'Atualizar' : 'Conectar'}
+                  onPress={() => void onConnect(c)}
+                  busy={busyKey === key}
+                  disabled={locked && busyKey !== key}
+                  style={styles.actionBtn}
+                />
+              </EntryRow>
+            </View>
+          );
+        })}
 
         {enabled ? (
           <View style={styles.actions}>
@@ -169,19 +184,20 @@ export default function HealthScreen() {
               variant="secondary"
               label="Atualizar agora"
               onPress={() => void onSync()}
-              disabled={busy}
+              busy={busyKey === 'sync'}
+              disabled={locked && busyKey !== 'sync'}
               style={styles.actionBtn}
             />
             <Button
               variant="ghost"
               label="Desconectar"
               onPress={() => void onDisable()}
-              disabled={busy}
+              busy={busyKey === 'disable'}
+              disabled={locked && busyKey !== 'disable'}
             />
           </View>
         ) : null}
 
-        {busy ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} /> : null}
         {lastImport ? <Caption style={styles.footer}>{lastImport}</Caption> : null}
       </ScrollView>
     </Screen>

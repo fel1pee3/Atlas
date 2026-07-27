@@ -32,8 +32,9 @@ export class ApiError extends Error {
     public readonly status: number,
     public readonly problem: ProblemDetail,
   ) {
-    const suffix = problem.traceId ? ` [${problem.traceId}]` : '';
-    super((problem.detail || problem.title) + suffix);
+    // Mensagem sem traceId — IDs ficam só em `problem` (logs/debug), não na UI.
+    super(problem.detail || problem.title || 'Erro');
+    this.name = 'ApiError';
   }
 }
 

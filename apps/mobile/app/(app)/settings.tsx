@@ -1,12 +1,8 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
+import { StyleSheet, Alert, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/state/auth.store';
 import { deleteAccountAndWipe, exportAndShare } from '../../src/features/privacy/privacy.service';
-import { purgeDemoLocalEvents } from '../../src/features/events/events.service';
-import { disableHealth } from '../../src/features/health/health.service';
-import { disableLocation } from '../../src/features/location/location.service';
-import { disableCalendar } from '../../src/features/calendar/calendar.service';
 import {
   loadDogfoodSnapshot,
   type DogfoodSnapshot,
@@ -25,13 +21,13 @@ import {
 } from '../../src/ui';
 
 /**
- * Ajustes — export / apagar / dogfooding (docs/19 §13, M7/M8).
+ * Ajustes — export / apagar / resumo de uso (docs/19 §13, M7/M8).
  */
 export default function SettingsScreen() {
   const router = useRouter();
   const logout = useAuth((s) => s.logout);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [busy, setBusy] = useState<'export' | 'delete' | 'purgeDemo' | null>(null);
+  const [busy, setBusy] = useState<'export' | 'delete' | null>(null);
   const [confirmText, setConfirmText] = useState('');
   const [dogfood, setDogfood] = useState<DogfoodSnapshot | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,34 +109,43 @@ export default function SettingsScreen() {
         <PageHeader
           title="Ajustes"
           lead="Seus dados são seus. Exporte quando quiser; apague de verdade."
+          style={styles.header}
         />
 
-        <SectionTitle>Dogfooding</SectionTitle>
+        <SectionTitle style={styles.firstSection}>Seu uso</SectionTitle>
+        <Caption style={styles.hint}>
+          Como você tem usado o Atlas — dias abertos e insights que marcou como úteis.
+        </Caption>
         {dogfood ? (
           <Ledger>
             <LedgerRow
-              label="Streak"
+              label="Dias seguidos"
               value={`${dogfood.streakDays} dia${dogfood.streakDays === 1 ? '' : 's'}`}
             />
-            <LedgerRow label="Aberturas" value={String(dogfood.openDaysTotal)} />
+            <LedgerRow
+              label="Dias com o app aberto"
+              value={String(dogfood.openDaysTotal)}
+            />
             {dogfood.stats ? (
               <>
                 <LedgerRow
-                  label="Úteis / semana"
-                  value={`${dogfood.stats.usefulThisWeek}${
-                    dogfood.stats.northStarMet ? ' · North Star' : ''
-                  }`}
+                  label="Insights úteis esta semana"
+                  value={
+                    dogfood.stats.northStarMet
+                      ? `${dogfood.stats.usefulThisWeek} · meta ok`
+                      : String(dogfood.stats.usefulThisWeek)
+                  }
                 />
                 <LedgerRow
-                  label="Totais"
-                  value={`${dogfood.stats.usefulTotal} úteis · ${dogfood.stats.eventsTotal} ev.`}
+                  label="No total"
+                  value={`${dogfood.stats.usefulTotal} úteis · ${dogfood.stats.eventsTotal} registros`}
                   last
                 />
               </>
             ) : (
               <LedgerRow
-                label="Stats"
-                value={dogfood.statsError ?? 'offline'}
+                label="Resumo do servidor"
+                value={dogfood.statsError ?? 'Sem conexão'}
                 last
               />
             )}
@@ -148,50 +153,6 @@ export default function SettingsScreen() {
         ) : (
           <ActivityIndicator color={colors.primary} />
         )}
-
-        <SectionTitle>Dados reais</SectionTitle>
-        <Caption style={styles.hint}>
-          Remove eventos Demo locais e desativa conectores sintéticos.
-        </Caption>
-        <Button
-          variant="secondary"
-          label="Limpar dados Demo"
-          busy={busy === 'purgeDemo'}
-          disabled={busy !== null}
-          onPress={() => {
-            Alert.alert(
-              'Limpar dados Demo?',
-              'Apaga só eventos locais sintéticos. Eventos reais e a conta ficam.',
-              [
-                { text: 'Cancelar', style: 'cancel' },
-                {
-                  text: 'Limpar Demo',
-                  style: 'destructive',
-                  onPress: () => {
-                    void (async () => {
-                      setBusy('purgeDemo');
-                      try {
-                        const removed = await purgeDemoLocalEvents();
-                        await disableHealth();
-                        await disableLocation();
-                        await disableCalendar();
-                        Alert.alert('Pronto', `${removed} eventos Demo removidos.`);
-                        await loadDogfood();
-                      } catch (err) {
-                        Alert.alert(
-                          'Falha',
-                          err instanceof Error ? err.message : 'Erro ao limpar Demo',
-                        );
-                      } finally {
-                        setBusy(null);
-                      }
-                    })();
-                  },
-                },
-              ],
-            );
-          }}
-        />
 
         <SectionTitle>Portabilidade</SectionTitle>
         <Button
@@ -240,6 +201,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { ...pagePad, gap: spacing.sm },
+  header: { marginBottom: spacing.sm },
+  firstSection: { marginTop: 0, marginBottom: spacing.xs },
   hint: { marginBottom: spacing.sm, lineHeight: 18 },
   field: { marginBottom: spacing.sm },
 });

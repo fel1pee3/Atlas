@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import * as Location from 'expo-location';
 import type { LocationConnector, LocationPullResult, LocationSample } from './location.connector';
+import { formatPlaceLabel } from './place-label';
 
 /**
  * Localização do aparelho via expo-location (docs/08 §10.1).
@@ -20,7 +21,7 @@ export class DeviceLocationConnector implements LocationConnector {
     return { granted: status === Location.PermissionStatus.GRANTED };
   }
 
-  async pullSince(since: string, _until?: string): Promise<LocationPullResult> {
+  async pullSince(_since: string, _until?: string): Promise<LocationPullResult> {
     if (!(await this.isAvailable())) {
       throw new Error(
         'Localização nativa requer development build + expo-location (não Expo Go puro).',
@@ -32,15 +33,12 @@ export class DeviceLocationConnector implements LocationConnector {
       throw new Error('Permissão de localização não concedida.');
     }
 
+    // Alta precisão: visita pontual (não tracking contínuo).
     const pos = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
+      accuracy: Location.Accuracy.High,
     });
     const occurredAt = new Date(pos.timestamp).toISOString();
     const nextCursor = new Date().toISOString();
-
-    if (occurredAt <= since) {
-      return { samples: [], nextCursor };
-    }
 
     let label: string | undefined;
     try {
@@ -48,10 +46,7 @@ export class DeviceLocationConnector implements LocationConnector {
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,
       });
-      const p = places[0];
-      if (p) {
-        label = [p.name, p.street, p.city, p.region].filter(Boolean).join(', ') || undefined;
-      }
+      if (places[0]) label = formatPlaceLabel(places[0]);
     } catch {
       // reverse geocode is best-effort
     }
@@ -60,12 +55,15 @@ export class DeviceLocationConnector implements LocationConnector {
     const lng = Number(pos.coords.longitude.toFixed(5));
     const day = occurredAt.slice(0, 10);
     const sample: LocationSample = {
+      // Um ponto por dia/coordenada arredondada; re-sync no mesmo lugar não duplica.
       externalId: `device:visit:${day}:${lat},${lng}`,
       type: 'location.visited',
       occurredAt,
       payload: {
         lat: pos.coords.latitude,
         lng: pos.coords.longitude,
+        accuracyM:
+          typeof pos.coords.accuracy === 'number' ? Math.round(pos.coords.accuracy) : undefined,
         label,
         arrivedAt: occurredAt,
       },

@@ -32,7 +32,7 @@ export function BootScreen({ fontsReady = true }: Props) {
       <View style={styles.glowBottom} pointerEvents="none" />
 
       <View style={styles.center}>
-        <LogoMark size={112} />
+        <LogoMark size={72} />
         <Text
           style={[
             styles.wordmark,
@@ -90,13 +90,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   wordmark: {
-    marginTop: spacing.xl,
-    fontSize: 40,
+    marginTop: spacing.sm,
+    fontSize: 34,
     color: colors.text,
-    letterSpacing: -1,
+    letterSpacing: -0.8,
   },
   tagline: {
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     fontSize: font.size.sm,
     color: colors.textMuted,
     letterSpacing: 0.2,

@@ -8,20 +8,26 @@ import { Screen, TextField, Button, Caption, PageHeader } from '../../src/ui';
 
 type Kind = 'note' | 'mood' | 'expense';
 
-function parseAmount(raw: string): number | null {
-  let normalized = raw.trim().replace(/\s/g, '').replace(/R\$/gi, '');
-  if (!normalized) return null;
+/** Digits-only → centavos (ex.: "1" = 1 centavo). */
+function digitsToCents(digits: string): number {
+  const clean = digits.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  if (!clean) return 0;
+  // Limite razoável (~R$ 99.999.999,99)
+  const clipped = clean.slice(0, 10);
+  return Number(clipped);
+}
 
-  const hasComma = normalized.includes(',');
-  const hasDot = normalized.includes('.');
-  if (hasComma && hasDot) {
-    normalized = normalized.replace(/\./g, '').replace(',', '.');
-  } else if (hasComma) {
-    normalized = normalized.replace(',', '.');
-  }
+/** Centavos → "12.345,67" (pt-BR). */
+function formatCentsBrl(cents: number): string {
+  const value = cents / 100;
+  return value.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
-  const value = Number(normalized);
-  return Number.isFinite(value) && value >= 0 ? value : null;
+function centsFromMaskedInput(raw: string): number {
+  return digitsToCents(raw.replace(/\D/g, ''));
 }
 
 /**
@@ -32,7 +38,8 @@ export default function AddEventScreen() {
   const [kind, setKind] = useState<Kind>('note');
   const [text, setText] = useState('');
   const [mood, setMood] = useState(3);
-  const [amount, setAmount] = useState('');
+  /** Valor do gasto em centavos (máscara começa pelos centavos). */
+  const [amountCents, setAmountCents] = useState(0);
   const [busy, setBusy] = useState(false);
 
   async function save() {
@@ -59,16 +66,15 @@ export default function AddEventScreen() {
           payload: { score: mood },
         });
       } else {
-        const parsed = parseAmount(amount);
-        if (parsed === null) {
-          Alert.alert('Valor inválido', 'Informe um valor numérico (ex.: 12,50).');
+        if (amountCents <= 0) {
+          Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
           return;
         }
         await addEvent({
           type: EVENT_TYPES.MANUAL_EXPENSE,
           source: EVENT_SOURCES.MANUAL,
           occurredAt,
-          payload: { amount: parsed, currency: 'BRL' },
+          payload: { amount: amountCents / 100, currency: 'BRL' },
         });
       }
       router.back();
@@ -79,14 +85,21 @@ export default function AddEventScreen() {
 
   return (
     <Screen safe={false} padded style={styles.container}>
-      <PageHeader title="Registrar" lead="Nota, humor ou gasto — fica no aparelho primeiro." />
+      <PageHeader
+        title="Registrar"
+        lead="Nota, humor ou gasto — fica no aparelho primeiro."
+        style={styles.header}
+      />
 
       <View style={styles.tabs}>
         {(['note', 'mood', 'expense'] as Kind[]).map((k) => (
           <Pressable
             key={k}
             style={[styles.tab, kind === k && styles.tabOn]}
-            onPress={() => setKind(k)}
+            onPress={() => {
+              setKind(k);
+              if (k !== 'expense') setAmountCents(0);
+            }}
           >
             <Caption style={kind === k ? styles.tabOnText : styles.tabText}>
               {k === 'note' ? 'Nota' : k === 'mood' ? 'Humor' : 'Gasto'}
@@ -120,10 +133,11 @@ export default function AddEventScreen() {
 
       {kind === 'expense' && (
         <TextField
-          placeholder="Valor (R$)"
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
+          placeholder="R$ 0,00"
+          keyboardType="number-pad"
+          value={`R$ ${formatCentsBrl(amountCents)}`}
+          onChangeText={(raw) => setAmountCents(centsFromMaskedInput(raw))}
+          accessibilityLabel="Valor em reais"
         />
       )}
 
@@ -133,7 +147,8 @@ export default function AddEventScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { paddingTop: spacing.md, gap: spacing.lg },
+  container: { paddingTop: spacing.md, gap: spacing.md },
+  header: { marginBottom: 0 },
   tabs: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,

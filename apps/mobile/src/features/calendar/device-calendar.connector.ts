@@ -83,7 +83,8 @@ export class DeviceCalendarConnector implements CalendarConnector {
     }
 
     samples.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
-    return { samples, nextCursor: endDate.toISOString() };
+    // Cursor = momento do pull (não o fim da janela futura — senão o próximo sync fica vazio).
+    return { samples, nextCursor: new Date().toISOString() };
   }
 }
 

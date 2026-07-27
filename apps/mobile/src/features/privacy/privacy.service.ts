@@ -6,10 +6,10 @@ import {
   EncodingType,
 } from 'expo-file-system/legacy';
 import { accountApi, api } from '../../lib/api';
-import { getDb, resetLocalDb } from '../../db/client';
+import { getDb } from '../../db/client';
 import { events } from '../../db/schema';
 import { useAuth } from '../../state/auth.store';
-import { useOnboarding } from '../onboarding/onboarding.store';
+import { wipeLocalSession } from '../session/wipe-local-session';
 
 /**
  * Export / delete (docs/15 §7, docs/19 §13–15.4, M7).
@@ -67,7 +67,7 @@ export async function exportAndShare(): Promise<{ counts: Record<string, number>
  */
 export async function deleteAccountAndWipe(): Promise<void> {
   await accountApi.delete();
-  resetLocalDb();
-  useOnboarding.getState().reset();
+  // logoutLocalOnly também dá wipe; chama antes só para garantir ordem explícita.
+  wipeLocalSession();
   await useAuth.getState().logoutLocalOnly();
 }

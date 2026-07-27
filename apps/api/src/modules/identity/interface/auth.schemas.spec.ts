@@ -5,7 +5,7 @@ describe('Auth Zod schemas', () => {
     it('aceita e-mail/senha válidos', () => {
       const parsed = RegisterSchema.parse({
         email: 'user@atlas.test',
-        password: 'senha-segura',
+        password: 'Senha-segura1',
       });
       expect(parsed.email).toBe('user@atlas.test');
     });
@@ -16,9 +16,15 @@ describe('Auth Zod schemas', () => {
       ).toThrow();
     });
 
+    it('rejeita senha sem maiúscula/número/símbolo', () => {
+      expect(() =>
+        RegisterSchema.parse({ email: 'user@atlas.test', password: 'senhasegur' }),
+      ).toThrow();
+    });
+
     it('rejeita e-mail inválido', () => {
       expect(() =>
-        RegisterSchema.parse({ email: 'nao-email', password: 'senha-segura' }),
+        RegisterSchema.parse({ email: 'nao-email', password: 'Senha-segura1' }),
       ).toThrow();
     });
   });

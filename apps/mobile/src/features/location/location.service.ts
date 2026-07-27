@@ -57,20 +57,26 @@ function sourceFor(connector: LocationConnector): string {
   return connector.id === 'device_location' ? EVENT_SOURCES.DEVICE_LOCATION : EVENT_SOURCES.DEMO;
 }
 
+export type LocationSyncResult = {
+  imported: number;
+  pushed: number;
+  /** O que o GPS/reverse-geocode leu agora (para conferir). */
+  reading?: {
+    label?: string;
+    lat: number;
+    lng: number;
+    accuracyM?: number;
+  };
+};
+
 export async function syncLocationNow(
   connector: LocationConnector = resolveLocationConnector(),
-): Promise<{ imported: number; pushed: number }> {
+): Promise<LocationSyncResult> {
   if (!(await isLocationEnabled())) return { imported: 0, pushed: 0 };
 
-  const since =
-    (await getMeta(META_CURSOR)) ??
-    (() => {
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - 30);
-      return d.toISOString();
-    })();
-
-  const { samples, nextCursor } = await connector.pullSince(since);
+  // Sempre lê a posição atual (visita pontual). Cursor só registra “última sync”.
+  const since = new Date(0).toISOString();
+  const { samples } = await connector.pullSince(since);
   const source = sourceFor(connector);
   let imported = 0;
   for (const sample of samples) {
@@ -89,10 +95,22 @@ export async function syncLocationNow(
     imported += await seedDemoMoodFromVisits(samples);
   }
 
-  await setMeta(META_CURSOR, nextCursor);
+  await setMeta(META_CURSOR, new Date().toISOString());
   await setMeta(META_CONNECTOR, connector.id);
   void pushPendingBatch().catch(() => undefined);
-  return { imported, pushed: 0 };
+
+  const first = samples[0];
+  const reading = first
+    ? {
+        label: first.payload.label,
+        lat: first.payload.lat,
+        lng: first.payload.lng,
+        accuracyM:
+          typeof first.payload.accuracyM === 'number' ? first.payload.accuracyM : undefined,
+      }
+    : undefined;
+
+  return { imported, pushed: 0, reading };
 }
 
 async function seedDemoMoodFromVisits(

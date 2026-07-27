@@ -38,7 +38,7 @@ type LockupProps = {
 
 /** Mark + wordmark “Atlas”. */
 export function BrandLockup({
-  markSize = 40,
+  markSize = 28,
   showWordmark = true,
   vertical = false,
   style,
@@ -48,7 +48,7 @@ export function BrandLockup({
       style={[styles.lockup, vertical && styles.lockupVertical, style]}
       accessibilityRole="header"
     >
-      <LogoMark size={markSize} />
+      <LogoMark size={markSize} style={styles.mark} />
       {showWordmark ? (
         <Text style={[styles.wordmark, vertical && styles.wordmarkHero]}>Atlas</Text>
       ) : null}
@@ -60,17 +60,22 @@ const styles = StyleSheet.create({
   lockup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   lockupVertical: {
     flexDirection: 'column',
     gap: spacing.lg,
   },
+  mark: {
+    // Alinha o símbolo à altura do wordmark (óptica).
+    marginTop: 1,
+  },
   wordmark: {
     fontFamily: font.family.serifBold,
-    fontSize: font.size.xxl,
+    fontSize: 28,
+    lineHeight: 32,
     color: colors.text,
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
   wordmarkHero: {
     fontSize: 42,

@@ -10,6 +10,8 @@ export interface LocationSample {
   payload: {
     lat: number;
     lng: number;
+    /** Raio de incerteza do GPS (metros), se o SO informar. */
+    accuracyM?: number;
     label?: string;
     arrivedAt?: string;
     leftAt?: string;

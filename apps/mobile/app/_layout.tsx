@@ -17,6 +17,7 @@ import { useAuth } from '../src/state/auth.store';
 import { initLocalDb } from '../src/db/client';
 import { useOnboarding } from '../src/features/onboarding/onboarding.store';
 import { recordAppOpen } from '../src/features/dogfood/dogfood.service';
+import { useAutoSync } from '../src/features/sync/useAutoSync';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { colors, font } from '../src/theme';
 import { BootScreen } from '../src/ui';
@@ -25,7 +26,7 @@ void SplashScreen.preventAutoHideAsync();
 
 /**
  * Rotas:
- * - /login              → autenticação (explícita)
+ * - /login, /register   → autenticação (explícitas)
  * - /(app)/*            → app logado (timeline em / via (app)/index)
  * - /(onboarding)/*     → onboarding
  *
@@ -55,6 +56,8 @@ export default function RootLayout() {
     status !== 'loading' &&
     !(status === 'authenticated' && onboarded === null);
 
+  useAutoSync(status === 'authenticated' && onboarded === true);
+
   useEffect(() => {
     try {
       initLocalDb();
@@ -75,12 +78,12 @@ export default function RootLayout() {
     if (!bootReady) return;
 
     const root = segments[0];
-    const onLogin = root === 'login';
+    const onAuth = root === 'login' || root === 'register';
     const inApp = root === '(app)';
     const inOnboarding = root === '(onboarding)';
 
     if (status === 'unauthenticated') {
-      if (!onLogin) {
+      if (!onAuth) {
         router.replace('/login');
       }
       return;
@@ -92,7 +95,7 @@ export default function RootLayout() {
       return;
     }
 
-    if (onLogin || inOnboarding || !inApp) {
+    if (onAuth || inOnboarding || !inApp) {
       router.replace('/(app)');
     }
   }, [bootReady, status, onboarded, segments, router]);

@@ -60,20 +60,30 @@ function sourceFor(connector: CalendarConnector): string {
   return EVENT_SOURCES.DEMO;
 }
 
+export type CalendarSyncResult = {
+  imported: number;
+  pushed: number;
+  /** Quantos compromissos a agenda do aparelho devolveu nesta leitura. */
+  pulled: number;
+  /** Títulos lidos (para o usuário conferir). */
+  titles: string[];
+};
+
+/**
+ * Releia sempre a janela recente (30d atrás → 14d à frente).
+ * O cursor antigo apontava para o futuro e fazia o 2º sync ignorar eventos novos.
+ */
 export async function syncCalendarNow(
   connector: CalendarConnector = resolveCalendarConnector(),
-): Promise<{ imported: number; pushed: number }> {
-  if (!(await isCalendarEnabled())) return { imported: 0, pushed: 0 };
+): Promise<CalendarSyncResult> {
+  if (!(await isCalendarEnabled())) {
+    return { imported: 0, pushed: 0, pulled: 0, titles: [] };
+  }
 
-  const since =
-    (await getMeta(META_CURSOR)) ??
-    (() => {
-      const d = new Date();
-      d.setUTCDate(d.getUTCDate() - 30);
-      return d.toISOString();
-    })();
+  const windowStart = new Date();
+  windowStart.setUTCDate(windowStart.getUTCDate() - 30);
 
-  const { samples, nextCursor } = await connector.pullSince(since);
+  const { samples } = await connector.pullSince(windowStart.toISOString());
   const source = sourceFor(connector);
   let imported = 0;
   for (const sample of samples) {
@@ -92,10 +102,16 @@ export async function syncCalendarNow(
     imported += await seedDemoExpensesFromCalendar(samples);
   }
 
-  await setMeta(META_CURSOR, nextCursor);
+  await setMeta(META_CURSOR, new Date().toISOString());
   await setMeta(META_CONNECTOR, connector.id);
   void pushPendingBatch().catch(() => undefined);
-  return { imported, pushed: 0 };
+
+  const titles = samples
+    .map((s) => String(s.payload.title ?? '').trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  return { imported, pushed: 0, pulled: samples.length, titles };
 }
 
 /** Gastos sintéticos alinhados aos dias da agenda (explicáveis via source=demo). */

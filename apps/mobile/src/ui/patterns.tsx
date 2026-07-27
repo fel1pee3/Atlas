@@ -4,9 +4,17 @@ import { colors, font, spacing } from '../theme';
 import { Title, Body, Caption, Label } from './Typography';
 
 /** Cabeçalho de página no padrão da home (título serif + lead). */
-export function PageHeader({ title, lead }: { title: string; lead?: string }) {
+export function PageHeader({
+  title,
+  lead,
+  style,
+}: {
+  title: string;
+  lead?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   return (
-    <View style={styles.pageHeader}>
+    <View style={[styles.pageHeader, style]}>
       <Title style={styles.pageTitle}>{title}</Title>
       {lead ? <Caption style={styles.pageLead}>{lead}</Caption> : null}
     </View>
@@ -14,8 +22,14 @@ export function PageHeader({ title, lead }: { title: string; lead?: string }) {
 }
 
 /** Título de seção (como “Timeline”). */
-export function SectionTitle({ children }: { children: ReactNode }) {
-  return <Title style={styles.sectionTitle}>{children}</Title>;
+export function SectionTitle({
+  children,
+  style,
+}: {
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return <Title style={[styles.sectionTitle, style]}>{children}</Title>;
 }
 
 export function Ledger({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {

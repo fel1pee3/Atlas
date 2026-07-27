@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import { authApi, configureApi, type AuthTokens } from '../lib/api';
+import { humanizeAuthError } from '../features/auth/auth-errors';
+import { wipeLocalSession } from '../features/session/wipe-local-session';
 
 /**
  * Store de autenticação (docs/16_Security.md).
@@ -14,6 +16,7 @@ interface AuthState {
   refreshToken: string | null;
   status: 'loading' | 'authenticated' | 'unauthenticated';
   error: string | null;
+  clearError: () => void;
   hydrate: () => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -39,6 +42,8 @@ export const useAuth = create<AuthState>((set, get) => ({
   status: 'loading',
   error: null,
 
+  clearError: () => set({ error: null }),
+
   hydrate: async () => {
     try {
       const accessToken = await SecureStore.getItemAsync(ACCESS_KEY);
@@ -59,10 +64,12 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ error: null });
     try {
       const tokens = await authApi.register(email, password);
+      // Conta nova no mesmo aparelho não herda timeline da conta anterior.
+      wipeLocalSession();
       await persist(tokens);
       set({ ...tokens, status: 'authenticated' });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : 'Falha ao registrar' });
+      set({ error: humanizeAuthError(e, 'register') });
       throw e;
     }
   },
@@ -71,17 +78,20 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ error: null });
     try {
       const tokens = await authApi.login(email, password);
+      // Troca de conta / reentrada: SQLite local não deve misturar usuários.
+      wipeLocalSession();
       await persist(tokens);
       set({ ...tokens, status: 'authenticated' });
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : 'Falha ao entrar' });
+      set({ error: humanizeAuthError(e, 'login') });
       throw e;
     }
   },
 
   logout: async () => {
     const { refreshToken } = get();
-    // Limpa sessão local na hora — não esperar a API (no celular parecia que "Sair" não fazia nada).
+    // Limpa sessão + CMHL local na hora — não esperar a API.
+    wipeLocalSession();
     await clearPersisted();
     set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
     if (refreshToken) {
@@ -90,6 +100,7 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   logoutLocalOnly: async () => {
+    wipeLocalSession();
     await clearPersisted();
     set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
   },
@@ -106,6 +117,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       set({ ...tokens, status: 'authenticated' });
       return tokens.accessToken;
     } catch {
+      // Sessão inválida: zera local para o próximo login não herdar dados.
+      wipeLocalSession();
       await clearPersisted();
       set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
       return null;

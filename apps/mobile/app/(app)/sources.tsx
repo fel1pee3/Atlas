@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import type { LocationConnector } from '../../src/features/location/location.connector';
 import {
@@ -31,11 +31,18 @@ import {
   Caption,
   Button,
   PageHeader,
-  SectionTitle,
   EntryRow,
   Hairline,
   pagePad,
 } from '../../src/ui';
+
+type BusyKey =
+  | `loc:connect:${string}`
+  | 'loc:sync'
+  | 'loc:disable'
+  | `cal:connect:${string}`
+  | 'cal:sync'
+  | 'cal:disable';
 
 /**
  * Fontes M4: Location + Calendar (docs/20 §5, docs/08 §10).
@@ -47,8 +54,10 @@ export default function SourcesScreen() {
   const [calEnabled, setCalEnabled] = useState(false);
   const [locActive, setLocActive] = useState<string | null>(null);
   const [calActive, setCalActive] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<BusyKey | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+
+  const locked = busyKey !== null;
 
   const refresh = useCallback(async () => {
     setLocConnectors(listLocationConnectors());
@@ -65,24 +74,31 @@ export default function SourcesScreen() {
     }, [refresh]),
   );
 
-  function primingThen(title: string, message: string, onContinue: () => Promise<void>) {
+  function runBusy(key: BusyKey, work: () => Promise<void>) {
+    void (async () => {
+      setBusyKey(key);
+      try {
+        await work();
+        await refresh();
+      } catch (err) {
+        Alert.alert('Falha', err instanceof Error ? err.message : 'Erro');
+      } finally {
+        setBusyKey(null);
+      }
+    })();
+  }
+
+  function primingThen(
+    title: string,
+    message: string,
+    key: BusyKey,
+    onContinue: () => Promise<void>,
+  ) {
     Alert.alert(title, message, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Continuar',
-        onPress: () => {
-          void (async () => {
-            setBusy(true);
-            try {
-              await onContinue();
-              await refresh();
-            } catch (err) {
-              Alert.alert('Falha', err instanceof Error ? err.message : 'Erro');
-            } finally {
-              setBusy(false);
-            }
-          })();
-        },
+        onPress: () => runBusy(key, onContinue),
       },
     ]);
   }
@@ -101,6 +117,7 @@ export default function SourcesScreen() {
         c.id === 'demo'
           ? 'Demo: visitas de exemplo só para testar no desenvolvimento.'
           : 'O Atlas registra lugares visitados — não um rastro contínuo de GPS.',
+        `loc:connect:${c.id}`,
         async () => {
           const { granted } = await enableLocation(c);
           if (!granted) {
@@ -108,11 +125,7 @@ export default function SourcesScreen() {
             return;
           }
           const r = await syncLocationNow(c);
-          setStatus(
-            r.imported === 1
-              ? 'Localização: 1 visita nova'
-              : `Localização: ${r.imported} visitas novas`,
-          );
+          setStatus(formatLocationStatus(r));
         },
       );
     })();
@@ -123,30 +136,22 @@ export default function SourcesScreen() {
       if (!(await c.isAvailable())) {
         Alert.alert(
           'Agenda indisponível',
-          c.id === 'google_calendar'
-            ? 'Google Agenda ainda não está configurada neste build. Prefira “Calendário do aparelho”.'
-            : `${calendarLabel(c)} ainda não está disponível neste aparelho.`,
+          `${calendarLabel(c)} ainda não está disponível neste aparelho.`,
         );
         return;
       }
       const message =
         c.id === 'demo'
           ? 'Demo: agenda de exemplo só para testar no desenvolvimento.'
-          : c.id === 'device_calendar'
-            ? 'O Atlas lê os compromissos já salvos na agenda do celular, sem login extra.'
-            : 'O Atlas lê compromissos com login na Google Agenda (opcional).';
-      primingThen('Conectar agenda', message, async () => {
+          : 'O Atlas lê os compromissos da agenda do celular e atualiza sozinho ao abrir o app.';
+      primingThen('Conectar agenda', message, `cal:connect:${c.id}`, async () => {
         const { granted } = await enableCalendar(c);
         if (!granted) {
           Alert.alert('Permissão negada', 'Nada foi alterado.');
           return;
         }
         const r = await syncCalendarNow(c);
-        setStatus(
-          r.imported === 1
-            ? 'Agenda: 1 compromisso novo'
-            : `Agenda: ${r.imported} compromissos novos`,
-        );
+        setStatus(formatCalendarStatus(r));
       });
     })();
   }
@@ -155,113 +160,106 @@ export default function SourcesScreen() {
     <Screen padded={false} safe={false}>
       <ScrollView contentContainerStyle={styles.container}>
         <PageHeader
-          title="Espaço & agenda"
-          lead="Onde você esteve e o que estava marcado. Preferência: calendário do aparelho."
+          title="Fontes"
+          lead="Lugares e agenda do celular. O Atlas atualiza sozinho ao abrir o app."
         />
 
-        <SectionTitle>Localização</SectionTitle>
-        {locConnectors.map((c, index) => (
-          <View key={c.id}>
-            {index > 0 ? <Hairline /> : null}
-            <EntryRow
-              kind={c.id === 'demo' ? 'Demo' : 'Lugares'}
-              meta={c.id === 'demo' ? 'dados de exemplo' : 'visitas'}
-              trailing={locActive === c.id && locEnabled ? 'ativo' : undefined}
-            >
-              <Caption style={styles.name}>{locationLabel(c)}</Caption>
-              <Button
-                label={locActive === c.id && locEnabled ? 'Atualizar' : 'Conectar'}
-                onPress={() => onConnectLocation(c)}
-                busy={busy}
-                style={styles.btn}
-              />
-            </EntryRow>
-          </View>
-        ))}
+        {locConnectors.map((c, index) => {
+          const key: BusyKey = `loc:connect:${c.id}`;
+          return (
+            <View key={c.id}>
+              {index > 0 ? <Hairline /> : null}
+              <EntryRow
+                kind={c.id === 'demo' ? 'Demo' : 'Lugares'}
+                meta={c.id === 'demo' ? 'dados de exemplo' : 'visitas'}
+                trailing={locActive === c.id && locEnabled ? 'ativo' : undefined}
+              >
+                <Caption style={styles.name}>{locationLabel(c)}</Caption>
+                <Button
+                  label={locActive === c.id && locEnabled ? 'Atualizar' : 'Conectar'}
+                  onPress={() => onConnectLocation(c)}
+                  busy={busyKey === key}
+                  disabled={locked && busyKey !== key}
+                  style={styles.btn}
+                />
+              </EntryRow>
+            </View>
+          );
+        })}
         {locEnabled ? (
           <View style={styles.actions}>
             <Button
               variant="secondary"
               label="Atualizar localização"
-              disabled={busy}
-              onPress={() => {
-                void (async () => {
-                  setBusy(true);
-                  try {
-                    const r = await syncLocationNow(
-                      locConnectors.find((x) => x.id === locActive) ?? resolveLocationConnector(),
-                    );
-                    setStatus(
-                      r.imported === 1
-                        ? 'Localização: 1 visita nova'
-                        : `Localização: ${r.imported} visitas novas`,
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
+              busy={busyKey === 'loc:sync'}
+              disabled={locked && busyKey !== 'loc:sync'}
+              onPress={() =>
+                runBusy('loc:sync', async () => {
+                  const r = await syncLocationNow(
+                    locConnectors.find((x) => x.id === locActive) ?? resolveLocationConnector(),
+                  );
+                  setStatus(formatLocationStatus(r));
+                })
+              }
             />
             <Button
               variant="ghost"
               label="Desconectar localização"
-              onPress={() => void disableLocation().then(refresh)}
+              busy={busyKey === 'loc:disable'}
+              disabled={locked && busyKey !== 'loc:disable'}
+              onPress={() => runBusy('loc:disable', () => disableLocation())}
             />
           </View>
         ) : null}
 
-        <SectionTitle>Agenda</SectionTitle>
-        {calConnectors.map((c, index) => (
-          <View key={c.id}>
-            {index > 0 ? <Hairline /> : null}
-            <EntryRow
-              kind={c.id === 'demo' ? 'Demo' : 'Agenda'}
-              meta={c.id === 'demo' ? 'dados de exemplo' : 'compromissos'}
-              trailing={calActive === c.id && calEnabled ? 'ativo' : undefined}
-            >
-              <Caption style={styles.name}>{calendarLabel(c)}</Caption>
-              <Button
-                label={calActive === c.id && calEnabled ? 'Atualizar' : 'Conectar'}
-                onPress={() => onConnectCalendar(c)}
-                busy={busy}
-                style={styles.btn}
-              />
-            </EntryRow>
-          </View>
-        ))}
+        {calConnectors.map((c, index) => {
+          const key: BusyKey = `cal:connect:${c.id}`;
+          return (
+            <View key={c.id}>
+              {index > 0 ? <Hairline /> : null}
+              <EntryRow
+                kind={c.id === 'demo' ? 'Demo' : 'Agenda'}
+                meta={c.id === 'demo' ? 'dados de exemplo' : 'compromissos'}
+                trailing={calActive === c.id && calEnabled ? 'ativo' : undefined}
+              >
+                <Caption style={styles.name}>{calendarLabel(c)}</Caption>
+                <Button
+                  label={calActive === c.id && calEnabled ? 'Atualizar' : 'Conectar'}
+                  onPress={() => onConnectCalendar(c)}
+                  busy={busyKey === key}
+                  disabled={locked && busyKey !== key}
+                  style={styles.btn}
+                />
+              </EntryRow>
+            </View>
+          );
+        })}
         {calEnabled ? (
           <View style={styles.actions}>
             <Button
               variant="secondary"
               label="Atualizar agenda"
-              disabled={busy}
-              onPress={() => {
-                void (async () => {
-                  setBusy(true);
-                  try {
-                    const r = await syncCalendarNow(
-                      calConnectors.find((x) => x.id === calActive) ?? resolveCalendarConnector(),
-                    );
-                    setStatus(
-                      r.imported === 1
-                        ? 'Agenda: 1 compromisso novo'
-                        : `Agenda: ${r.imported} compromissos novos`,
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
-                })();
-              }}
+              busy={busyKey === 'cal:sync'}
+              disabled={locked && busyKey !== 'cal:sync'}
+              onPress={() =>
+                runBusy('cal:sync', async () => {
+                  const r = await syncCalendarNow(
+                    calConnectors.find((x) => x.id === calActive) ?? resolveCalendarConnector(),
+                  );
+                  setStatus(formatCalendarStatus(r));
+                })
+              }
             />
             <Button
               variant="ghost"
               label="Desconectar agenda"
-              onPress={() => void disableCalendar().then(refresh)}
+              busy={busyKey === 'cal:disable'}
+              disabled={locked && busyKey !== 'cal:disable'}
+              onPress={() => runBusy('cal:disable', () => disableCalendar())}
             />
           </View>
         ) : null}
 
-        {busy ? <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} /> : null}
         {status ? <Caption style={styles.footer}>{status}</Caption> : null}
       </ScrollView>
     </Screen>
@@ -277,9 +275,30 @@ function locationLabel(c: LocationConnector): string {
 function calendarLabel(c: CalendarConnector): string {
   if (c.id === 'demo') return 'Demo (só desenvolvimento)';
   if (c.id === 'device_calendar') return 'Calendário do aparelho';
-  if (c.id === 'google_calendar') return 'Google Agenda';
-  if (c.id === 'apple_calendar') return 'Calendário Apple';
   return c.label.replace(/\(__DEV__ only\)/i, '(só desenvolvimento)');
+}
+
+function formatLocationStatus(r: Awaited<ReturnType<typeof syncLocationNow>>): string {
+  const place = r.reading?.label?.trim();
+  const coords =
+    r.reading != null
+      ? `${r.reading.lat.toFixed(5)}, ${r.reading.lng.toFixed(5)}`
+      : null;
+  const accuracy =
+    r.reading?.accuracyM != null ? ` (±${r.reading.accuracyM} m)` : '';
+  const where = place ? `${place}${accuracy}` : coords ? `${coords}${accuracy}` : 'posição lida';
+  if (r.imported > 0) {
+    return `Localização: ${where} · ${r.imported === 1 ? '1 visita nova' : `${r.imported} visitas novas`}`;
+  }
+  return `Localização: ${where} · já registrada (nada novo)`;
+}
+
+function formatCalendarStatus(r: Awaited<ReturnType<typeof syncCalendarNow>>): string {
+  const sample = r.titles.length > 0 ? ` · ex.: ${r.titles.slice(0, 3).join('; ')}` : '';
+  if (r.imported > 0) {
+    return `Agenda: ${r.imported} novo(s) de ${r.pulled} lido(s)${sample}`;
+  }
+  return `Agenda: ${r.pulled} lido(s), nenhum novo${sample}`;
 }
 
 const styles = StyleSheet.create({
