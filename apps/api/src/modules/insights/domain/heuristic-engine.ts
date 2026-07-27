@@ -8,14 +8,23 @@ import type { InsightCandidate } from './insight.repository';
 
 /**
  * Motor heurístico M3 — degraus 1–2 da escada (docs/12 §2, §7).
- * Funções puras: fáceis de testar; sem LLM; n mínimo antes de afirmar padrão.
+ * Limiares pensados para dogfooding cedo (3–5 dias), sem LLM.
  */
 
-const MIN_SLEEP_DAYS = 7;
+/** Média / resumo precoce — antes exigia 7. */
+const MIN_SLEEP_DAYS = 3;
+const MIN_STEPS_DAYS = 3;
 const SHORT_SLEEP_MIN = 360; // < 6h
 const STREAK_MIN = 3;
 const LOW_STEPS = 4000;
-const BASELINE_DELTA_MIN = 30; // minutos
+const BASELINE_DELTA_MIN = 25; // minutos
+/** Baseline mais curta pra MVP testável. */
+const MIN_BASELINE_TOTAL = 8;
+const RECENT_WINDOW = 3;
+const MIN_BASELINE_DAYS = 4;
+const MIN_STEPS_TREND_DAYS = 6;
+/** Última noite vs média anterior — Δ mínimo. */
+const LAST_VS_AVG_DELTA_MIN = 40;
 
 export interface HeuristicInput {
   sleepEvents: EventRecord[];
@@ -83,7 +92,7 @@ function sortedDays(map: Map<string, unknown>): string[] {
   return [...map.keys()].sort();
 }
 
-/** 1. Resumo de média de sono (onboarding "aha" — docs/20 §2.6). */
+/** 1. Resumo de média de sono (aha cedo — 3+ dias). */
 export function detectSleepAvgSummary(input: HeuristicInput): InsightCandidate | null {
   const byDay = sleepByDay(input.sleepEvents);
   const days = sortedDays(byDay);
@@ -99,7 +108,38 @@ export function detectSleepAvgSummary(input: HeuristicInput): InsightCandidate |
     kind: INSIGHT_KINDS.SLEEP_AVG_SUMMARY,
     title: 'Sua média de sono recente',
     body: `Nos últimos ${days.length} dias com registro, você dormiu em média ${formatHm(avg)} por noite.`,
-    confidence: Math.min(0.9, 0.5 + days.length / 60),
+    confidence: Math.min(0.9, 0.45 + days.length / 40),
+    method: INSIGHT_METHODS.STATS,
+    evidence: ids.map((eventId) => ({ eventId, weight: 1 })),
+  };
+}
+
+/**
+ * 1b. Última noite vs média das anteriores (3+ dias) — sinal cedo e acionável.
+ */
+export function detectLastSleepVsAvg(input: HeuristicInput): InsightCandidate | null {
+  const byDay = sleepByDay(input.sleepEvents);
+  const days = sortedDays(byDay);
+  if (days.length < MIN_SLEEP_DAYS) return null;
+
+  const lastDay = days[days.length - 1];
+  const prior = days.slice(0, -1);
+  if (prior.length < 2) return null;
+
+  const last = byDay.get(lastDay)!.min;
+  const avgPrior = mean(prior.map((d) => byDay.get(d)!.min));
+  const delta = last - avgPrior;
+  if (Math.abs(delta) < LAST_VS_AVG_DELTA_MIN) return null;
+
+  const better = delta > 0;
+  const ids = days.flatMap((d) => byDay.get(d)!.ids);
+
+  return {
+    fingerprint: `${INSIGHT_KINDS.SLEEP_LAST_VS_AVG}:${lastDay}`,
+    kind: INSIGHT_KINDS.SLEEP_LAST_VS_AVG,
+    title: better ? 'Última noite acima da média' : 'Última noite abaixo da média',
+    body: `Na noite de ${lastDay} você dormiu ${formatHm(last)} — cerca de ${Math.round(Math.abs(delta))} min ${better ? 'a mais' : 'a menos'} que a média das ${prior.length} noites anteriores (${formatHm(Math.round(avgPrior))}). Observação — não afirma causa.`,
+    confidence: Math.min(0.8, 0.5 + Math.abs(delta) / 150),
     method: INSIGHT_METHODS.STATS,
     evidence: ids.map((eventId) => ({ eventId, weight: 1 })),
   };
@@ -155,17 +195,16 @@ export function detectShortSleepStreak(input: HeuristicInput): InsightCandidate 
 }
 
 /**
- * 3. Estatística: média dos últimos 7 dias vs. baseline dos 14 anteriores.
- * Só emite se Δ >= 30 min e n suficiente (docs/12 §7.1).
+ * 3. Estatística: recente vs baseline (janela menor para MVP).
  */
 export function detectSleepBelowBaseline(input: HeuristicInput): InsightCandidate | null {
   const byDay = sleepByDay(input.sleepEvents);
   const days = sortedDays(byDay);
-  if (days.length < 14) return null;
+  if (days.length < MIN_BASELINE_TOTAL) return null;
 
-  const recentDays = days.slice(-7);
-  const baselineDays = days.slice(-21, -7);
-  if (baselineDays.length < 7) return null;
+  const recentDays = days.slice(-RECENT_WINDOW);
+  const baselineDays = days.slice(0, -RECENT_WINDOW).slice(-14);
+  if (baselineDays.length < MIN_BASELINE_DAYS) return null;
 
   const recentAvg = mean(recentDays.map((d) => byDay.get(d)!.min));
   const baselineAvg = mean(baselineDays.map((d) => byDay.get(d)!.min));
@@ -179,8 +218,8 @@ export function detectSleepBelowBaseline(input: HeuristicInput): InsightCandidat
     fingerprint: `${INSIGHT_KINDS.SLEEP_BELOW_BASELINE}:${asOf}`,
     kind: INSIGHT_KINDS.SLEEP_BELOW_BASELINE,
     title: 'Sono abaixo da sua baseline',
-    body: `Na última semana você dormiu ~${Math.round(delta)} min a menos por noite do que nas duas semanas anteriores (média recente ${formatHm(Math.round(recentAvg))} vs. ${formatHm(Math.round(baselineAvg))}). Associação observacional — não é causa.`,
-    confidence: Math.min(0.85, 0.55 + delta / 120),
+    body: `Nos últimos ${recentDays.length} dias você dormiu ~${Math.round(delta)} min a menos por noite do que nos ${baselineDays.length} dias anteriores (média recente ${formatHm(Math.round(recentAvg))} vs. ${formatHm(Math.round(baselineAvg))}). Associação observacional — não é causa.`,
+    confidence: Math.min(0.85, 0.5 + delta / 120),
     method: INSIGHT_METHODS.STATS,
     evidence: ids.map((eventId, i) => ({
       eventId,
@@ -189,11 +228,33 @@ export function detectSleepBelowBaseline(input: HeuristicInput): InsightCandidat
   };
 }
 
-/** 4. Tendência de passos: 1ª metade vs 2ª metade da janela. */
+/** 4a. Média de passos cedo (3+ dias). */
+export function detectStepsAvgSummary(input: HeuristicInput): InsightCandidate | null {
+  const byDay = stepsByDay(input.stepsEvents);
+  const days = sortedDays(byDay);
+  if (days.length < MIN_STEPS_DAYS) return null;
+
+  const values = days.map((d) => byDay.get(d)!.steps);
+  const avg = Math.round(mean(values));
+  const ids = days.flatMap((d) => byDay.get(d)!.ids);
+  const window = `${days[0]}_${days[days.length - 1]}`;
+
+  return {
+    fingerprint: `${INSIGHT_KINDS.ACTIVITY_STEPS_AVG_SUMMARY}:${window}`,
+    kind: INSIGHT_KINDS.ACTIVITY_STEPS_AVG_SUMMARY,
+    title: 'Sua média de passos recente',
+    body: `Nos últimos ${days.length} dias com registro, você andou em média ${avg.toLocaleString('pt-BR')} passos por dia.`,
+    confidence: Math.min(0.85, 0.45 + days.length / 40),
+    method: INSIGHT_METHODS.STATS,
+    evidence: ids.map((eventId) => ({ eventId, weight: 1 })),
+  };
+}
+
+/** 4b. Tendência de passos: 1ª metade vs 2ª (6+ dias). */
 export function detectStepsTrend(input: HeuristicInput): InsightCandidate | null {
   const byDay = stepsByDay(input.stepsEvents);
   const days = sortedDays(byDay);
-  if (days.length < 14) return null;
+  if (days.length < MIN_STEPS_TREND_DAYS) return null;
 
   const mid = Math.floor(days.length / 2);
   const first = days.slice(0, mid);
@@ -268,8 +329,10 @@ export function detectLowStepsStreak(input: HeuristicInput): InsightCandidate | 
 export function runHeuristicPipeline(input: HeuristicInput): InsightCandidate[] {
   return [
     detectSleepAvgSummary(input),
+    detectLastSleepVsAvg(input),
     detectShortSleepStreak(input),
     detectSleepBelowBaseline(input),
+    detectStepsAvgSummary(input),
     detectStepsTrend(input),
     detectLowStepsStreak(input),
   ].filter((c): c is InsightCandidate => c !== null);

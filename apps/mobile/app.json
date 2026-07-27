@@ -9,9 +9,8 @@
     "newArchEnabled": false,
     "icon": "./assets/brand/icon.png",
     "splash": {
-      "image": "./assets/brand/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F0F0F0"
+      "backgroundColor": "#EEF2F4",
+      "resizeMode": "contain"
     },
     "ios": {
       "supportsTablet": true,
@@ -29,7 +28,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/adaptive-foreground.png",
         "backgroundImage": "./assets/brand/adaptive-background.png",
-        "backgroundColor": "#F0F0F0"
+        "backgroundColor": "#EEF2F4"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
@@ -75,10 +74,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/brand/icon.png",
-          "imageWidth": 240,
-          "resizeMode": "contain",
-          "backgroundColor": "#F0F0F0"
+          "backgroundColor": "#EEF2F4",
+          "ios": {
+            "backgroundColor": "#EEF2F4"
+          },
+          "android": {
+            "backgroundColor": "#EEF2F4"
+          }
         }
       ]
     ],

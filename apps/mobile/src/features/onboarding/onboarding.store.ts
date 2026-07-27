@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { useAuth } from '../../state/auth.store';
+import { userIdFromAccessToken } from '../../lib/jwt';
 import {
   clearOnboardingCache,
   isOnboardingCompleted,
@@ -9,6 +11,7 @@ interface OnboardingState {
   done: boolean | null;
   refresh: () => Promise<void>;
   complete: () => Promise<void>;
+  /** Após apagar conta: força “não feito” até o próximo login. */
   reset: () => void;
 }
 
@@ -19,17 +22,18 @@ export const useOnboarding = create<OnboardingState>((set) => ({
   done: null,
 
   refresh: async () => {
-    set({ done: await isOnboardingCompleted() });
+    const userId = userIdFromAccessToken(useAuth.getState().accessToken);
+    set({ done: await isOnboardingCompleted(userId) });
   },
 
   complete: async () => {
-    await markOnboardingCompleted();
+    const userId = userIdFromAccessToken(useAuth.getState().accessToken);
+    if (!userId) return;
+    await markOnboardingCompleted(userId);
     set({ done: true });
   },
 
   reset: () => {
-    // false = "não feito" (após apagar conta). null = "ainda carregando" — nunca usar no logout
-    // senão o gate autentica + done=null e a UI fica em spinner/stack zumbi.
     clearOnboardingCache();
     set({ done: false });
   },

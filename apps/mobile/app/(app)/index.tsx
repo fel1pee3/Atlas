@@ -7,26 +7,32 @@ import {
   fetchDailySummary,
   type DailySummary,
 } from '../../src/features/sync/sync.service';
+import {
+  generateInsights,
+  listInsights,
+  type InsightListItem,
+} from '../../src/features/insights/insights.service';
 import type { LocalEvent } from '../../src/db/schema';
 import { isAbortLikeError } from '../../src/lib/api';
 import {
   eventKindLabel,
   formatEventWhen,
   formatSleep,
+  insightThemeLabel,
   summarizeEvent,
 } from '../../src/lib/humanize';
 import { colors, spacing, font, shadow } from '../../src/theme';
 import { Screen, Title, Body, Caption, Label } from '../../src/ui';
 
 /**
- * Timeline unificada + resumo "Hoje" (docs/20_MVP.md §2.3, docs/11 §5.1).
- * Lê do banco LOCAL (offline-first); no foco/refresh roda sync (health + push/pull).
+ * Timeline unificada + resumo "Hoje" + destaque de insight (docs/20, docs/19 §4).
  */
 export default function TimelineScreen() {
   const router = useRouter();
   const [items, setItems] = useState<LocalEvent[]>([]);
   const [daily, setDaily] = useState<DailySummary | null>(null);
   const [dailyOk, setDailyOk] = useState(false);
+  const [highlight, setHighlight] = useState<InsightListItem | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -43,14 +49,30 @@ export default function TimelineScreen() {
     }
   }, []);
 
+  const loadHighlight = useCallback(async () => {
+    try {
+      const list = await listInsights();
+      setHighlight(pickHighlight(list));
+    } catch {
+      /* mantém último */
+    }
+  }, []);
+
   const refreshAll = useCallback(async () => {
     await loadLocal();
     await loadDaily();
+    await loadHighlight();
     try {
       await syncNow();
       setSyncError(null);
       await loadLocal();
       await loadDaily();
+      try {
+        await generateInsights();
+      } catch {
+        /* auto-sync também tenta; não bloqueia a home */
+      }
+      await loadHighlight();
     } catch (err) {
       if (isAbortLikeError(err)) {
         setSyncError('Rede lenta — timeline local ok; puxe para tentar de novo');
@@ -58,8 +80,9 @@ export default function TimelineScreen() {
         setSyncError(err instanceof Error ? err.message : 'Sync falhou');
       }
       await loadDaily();
+      await loadHighlight();
     }
-  }, [loadLocal, loadDaily]);
+  }, [loadLocal, loadDaily, loadHighlight]);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,6 +118,13 @@ export default function TimelineScreen() {
               </Caption>
             ) : null}
             <TodaySummary daily={daily} dailyOk={dailyOk} />
+            <InsightHighlight
+              item={highlight}
+              onPress={() => {
+                if (highlight) router.push(`/(app)/insight/${highlight.id}`);
+              }}
+              onSeeAll={() => router.push('/(app)/insights')}
+            />
             {items.length > 0 ? (
               <Title style={styles.timelineTitle}>Timeline</Title>
             ) : null}
@@ -121,6 +151,60 @@ export default function TimelineScreen() {
         <Label style={styles.fabText}>+</Label>
       </Pressable>
     </Screen>
+  );
+}
+
+/** Prefere cross-domain, depois “útil”, depois maior confiança. */
+function pickHighlight(items: InsightListItem[]): InsightListItem | null {
+  if (items.length === 0) return null;
+  const scored = [...items].sort((a, b) => {
+    const score = (it: InsightListItem) =>
+      (it.kind.startsWith('cross.') ? 100 : 0) +
+      (it.status === 'useful' ? 40 : 0) +
+      (it.confidence ?? 0) * 20;
+    return score(b) - score(a);
+  });
+  return scored[0] ?? null;
+}
+
+function InsightHighlight({
+  item,
+  onPress,
+  onSeeAll,
+}: {
+  item: InsightListItem | null;
+  onPress: () => void;
+  onSeeAll: () => void;
+}) {
+  if (!item) {
+    return (
+      <View style={styles.highlightEmpty}>
+        <Caption style={styles.highlightEyebrow}>Observação</Caption>
+        <Body tone="muted" style={styles.highlightEmptyText}>
+          Ainda observando seus dados. Com alguns dias de sono, passos e agenda, algo aparece
+          aqui.
+        </Body>
+        <Pressable onPress={onSeeAll} accessibilityRole="button" hitSlop={8}>
+          <Caption style={styles.highlightLink}>Ver insights</Caption>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.highlight, pressed && styles.highlightPressed]}
+      accessibilityRole="button"
+      accessibilityLabel={`Insight: ${item.title}`}
+    >
+      <Caption style={styles.highlightEyebrow}>{insightThemeLabel(item.kind)}</Caption>
+      <Title style={styles.highlightTitle}>{item.title}</Title>
+      <Body tone="muted" style={styles.highlightBody} numberOfLines={3}>
+        {item.body}
+      </Body>
+      <Caption style={styles.highlightLink}>Ver evidências</Caption>
+    </Pressable>
   );
 }
 
@@ -256,7 +340,7 @@ const styles = StyleSheet.create({
   },
   syncWarn: { marginBottom: spacing.md, lineHeight: 18 },
   today: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
   },
   todayTitle: {
     fontSize: font.size.xxl,
@@ -296,6 +380,48 @@ const styles = StyleSheet.create({
     fontFamily: font.family.serif,
     color: colors.text,
     letterSpacing: -0.2,
+  },
+  highlight: {
+    marginBottom: spacing.xl,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  highlightPressed: { opacity: 0.85 },
+  highlightEmpty: {
+    marginBottom: spacing.xl,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: spacing.xs,
+  },
+  highlightEyebrow: {
+    fontFamily: font.family.sansMedium,
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    fontSize: 11,
+    marginBottom: spacing.xs,
+  },
+  highlightTitle: {
+    fontSize: font.size.lg,
+    fontFamily: font.family.serifBold,
+    letterSpacing: -0.3,
+    marginBottom: spacing.xs,
+  },
+  highlightBody: {
+    lineHeight: 22,
+    marginBottom: spacing.sm,
+  },
+  highlightEmptyText: {
+    lineHeight: 22,
+    marginBottom: spacing.sm,
+    maxWidth: 340,
+  },
+  highlightLink: {
+    color: colors.primary,
+    fontFamily: font.family.sansSemi,
+    fontSize: font.size.sm,
   },
   timelineTitle: {
     fontSize: font.size.xl,

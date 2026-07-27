@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, useRouter } from 'expo-router';
 import {
   getInsight,
   sendInsightFeedback,
@@ -30,9 +30,11 @@ import {
  * Detalhe de insight + evidências (docs/19 §8).
  */
 export default function InsightDetailScreen() {
+  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [detail, setDetail] = useState<InsightDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<'useful' | 'dismiss' | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -53,12 +55,21 @@ export default function InsightDetailScreen() {
   );
 
   async function feedback(action: 'useful' | 'dismiss') {
-    if (!id) return;
+    if (!id || busy) return;
+    setBusy(action);
     try {
       const updated = await sendInsightFeedback(id, action);
       setDetail((prev) => (prev ? { ...prev, status: updated.status } : prev));
+
+      if (action === 'dismiss') {
+        Alert.alert('Dispensado', 'Este insight saiu da sua lista.', [
+          { text: 'Ok', onPress: () => router.back() },
+        ]);
+      }
     } catch (err) {
       Alert.alert('Erro', err instanceof Error ? err.message : 'Falha no feedback');
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -79,6 +90,10 @@ export default function InsightDetailScreen() {
     );
   }
 
+  const isUseful = detail.status === 'useful';
+  const isDismissed = detail.status === 'dismissed';
+  const acted = isUseful || isDismissed;
+
   return (
     <Screen padded={false} safe={false}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -92,6 +107,17 @@ export default function InsightDetailScreen() {
             : ''}
           . Associação ≠ causa.
         </Caption>
+
+        {isUseful ? (
+          <View style={styles.statusBox} accessibilityLiveRegion="polite">
+            <Caption style={styles.statusUseful}>Marcado como útil</Caption>
+          </View>
+        ) : null}
+        {isDismissed ? (
+          <View style={styles.statusBox} accessibilityLiveRegion="polite">
+            <Caption style={styles.statusDismissed}>Dispensado — não aparece na lista</Caption>
+          </View>
+        ) : null}
 
         <SectionTitle>Evidências</SectionTitle>
         {detail.evidenceEvents.length === 0 ? (
@@ -108,12 +134,36 @@ export default function InsightDetailScreen() {
         )}
 
         <View style={styles.actions}>
-          <Button label="Marcar útil" onPress={() => void feedback('useful')} />
-          <Button
-            variant="secondary"
-            label="Dispensar"
-            onPress={() => void feedback('dismiss')}
-          />
+          {!acted ? (
+            <>
+              <Button
+                label="Marcar útil"
+                busy={busy === 'useful'}
+                disabled={busy !== null}
+                onPress={() => void feedback('useful')}
+              />
+              <Button
+                variant="secondary"
+                label="Dispensar"
+                busy={busy === 'dismiss'}
+                disabled={busy !== null}
+                onPress={() => void feedback('dismiss')}
+              />
+            </>
+          ) : isUseful ? (
+            <Button
+              variant="secondary"
+              label="Dispensar mesmo assim"
+              busy={busy === 'dismiss'}
+              disabled={busy !== null}
+              onPress={() => void feedback('dismiss')}
+            />
+          ) : (
+            <Button
+              label="Voltar à lista"
+              onPress={() => router.back()}
+            />
+          )}
         </View>
       </ScrollView>
     </Screen>
@@ -139,5 +189,20 @@ const styles = StyleSheet.create({
   },
   body: { marginBottom: spacing.md, lineHeight: 24 },
   meta: { lineHeight: 20, marginBottom: spacing.sm },
+  statusBox: {
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 10,
+    backgroundColor: colors.primaryMuted,
+  },
+  statusUseful: {
+    color: colors.primary,
+    fontFamily: font.family.sansSemi,
+  },
+  statusDismissed: {
+    color: colors.textMuted,
+    fontFamily: font.family.sansSemi,
+  },
   actions: { gap: spacing.sm, marginTop: spacing.xl },
 });

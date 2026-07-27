@@ -12,13 +12,14 @@ import type { InsightCandidate } from './insight.repository';
  * Linguagem associativa — nunca causal.
  */
 
-const MIN_GROUP = 5;
+/** 3 por grupo — dogfooding cedo; ainda exige contraste mínimo. */
+const MIN_GROUP = 3;
 const LATE_HOUR_UTC = 20;
-const BUSY_MEETINGS = 4;
-const AWAY_MIN = 10 * 60; // 10h
+const BUSY_MEETINGS = 3;
+const AWAY_MIN = 8 * 60; // 8h fora
 const MIN_SLEEP_DELTA = 25; // minutos
-const MIN_SPEND_RATIO = 1.25; // +25%
-const MIN_MOOD_DELTA = 0.4;
+const MIN_SPEND_RATIO = 1.2; // +20%
+const MIN_MOOD_DELTA = 0.35;
 
 export interface CrossDomainInput {
   sleepEvents: EventRecord[];
@@ -272,7 +273,7 @@ export function detectMoodWhenAway(input: CrossDomainInput): InsightCandidate | 
     fingerprint: `${INSIGHT_KINDS.CROSS_MOOD_WHEN_AWAY}:${input.asOfDay}`,
     kind: INSIGHT_KINDS.CROSS_MOOD_WHEN_AWAY,
     title: 'Humor mais baixo fora de casa',
-    body: `Em dias com mais de 10h fora de casa, seu humor médio foi ${avgAway.toFixed(1)}/5 (${longAway.length} dias) vs. ${avgHome.toFixed(1)}/5 nos demais (${homeish.length} dias). Padrão associativo — não é causa.`,
+    body: `Em dias com mais de 8h fora de casa, seu humor médio foi ${avgAway.toFixed(1)}/5 (${longAway.length} dias) vs. ${avgHome.toFixed(1)}/5 nos demais (${homeish.length} dias). Padrão associativo — não é causa.`,
     confidence: Math.min(0.8, 0.5 + delta / 2),
     method: INSIGHT_METHODS.STATS,
     evidence: [...new Set(longIds)].map((eventId) => ({ eventId, weight: 1.2 })).concat(

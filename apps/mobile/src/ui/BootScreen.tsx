@@ -1,26 +1,48 @@
-import { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as SplashScreen from 'expo-splash-screen';
 import { colors, font, spacing } from '../theme';
 import { LogoMark } from './Logo';
 
 type Props = {
-  /** Só esconde o splash nativo quando a fonte Literata já carregou. */
+  /** Literata/DM Sans carregadas — só então revelamos a marca (fiel ao Expo). */
   fontsReady?: boolean;
 };
 
 /**
- * Primeira tela do Atlas — marca flutuando na névoa, sem card/quadrado.
+ * Visual real do boot — idêntico ao que você vê no Expo.
+ * Splash nativa = só névoa #EEF2F4 (sem ícone minúsculo do Android 12+).
+ * Quando fontes + 1º paint estão prontos, a cor nativa some e a marca
+ * entra suave — uma tela só, sem “duas splashs”.
  */
 export function BootScreen({ fontsReady = true }: Props) {
+  const hidden = useRef(false);
+  const brand = useRef(new Animated.Value(0)).current;
+
+  const reveal = useCallback(() => {
+    if (hidden.current || !fontsReady) return;
+    hidden.current = true;
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void SplashScreen.hideAsync();
+        Animated.timing(brand, {
+          toValue: 1,
+          duration: 520,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }).start();
+      });
+    });
+  }, [brand, fontsReady]);
+
   useEffect(() => {
-    if (!fontsReady) return;
-    void SplashScreen.hideAsync();
-  }, [fontsReady]);
+    reveal();
+  }, [reveal]);
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={reveal}>
       <LinearGradient
         colors={['#F5F8FA', colors.bg, colors.bgDeep]}
         locations={[0, 0.45, 1]}
@@ -31,7 +53,22 @@ export function BootScreen({ fontsReady = true }: Props) {
       <View style={styles.glowTop} pointerEvents="none" />
       <View style={styles.glowBottom} pointerEvents="none" />
 
-      <View style={styles.center}>
+      <Animated.View
+        style={[
+          styles.center,
+          {
+            opacity: brand,
+            transform: [
+              {
+                translateY: brand.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [10, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
         <LogoMark size={72} />
         <Text
           style={[
@@ -47,14 +84,12 @@ export function BootScreen({ fontsReady = true }: Props) {
         <Text
           style={[
             styles.tagline,
-            fontsReady
-              ? { fontFamily: font.family.sans }
-              : undefined,
+            fontsReady ? { fontFamily: font.family.sans } : undefined,
           ]}
         >
           Sua vida, compreendida
         </Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }

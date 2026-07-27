@@ -3,6 +3,12 @@ import * as SecureStore from 'expo-secure-store';
 import { authApi, configureApi, type AuthTokens } from '../lib/api';
 import { humanizeAuthError } from '../features/auth/auth-errors';
 import { wipeLocalSession } from '../features/session/wipe-local-session';
+import {
+  clearOnboardingCache,
+  markOnboardingCompleted,
+  rememberLastUserId,
+} from '../features/onboarding/onboarding.service';
+import { userIdFromAccessToken } from '../lib/jwt';
 
 /**
  * Store de autenticação (docs/16_Security.md).
@@ -64,8 +70,10 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ error: null });
     try {
       const tokens = await authApi.register(email, password);
-      // Conta nova no mesmo aparelho não herda timeline da conta anterior.
+      const userId = userIdFromAccessToken(tokens.accessToken);
+      // Conta nova: não herda timeline; onboarding desta conta começa do zero.
       wipeLocalSession();
+      if (userId) await rememberLastUserId(userId);
       await persist(tokens);
       set({ ...tokens, status: 'authenticated' });
     } catch (e) {
@@ -78,8 +86,11 @@ export const useAuth = create<AuthState>((set, get) => ({
     set({ error: null });
     try {
       const tokens = await authApi.login(email, password);
-      // Troca de conta / reentrada: SQLite local não deve misturar usuários.
+      const userId = userIdFromAccessToken(tokens.accessToken);
+      // Conta já existe → pula Bem-vindo mesmo após reinstall / limpar dados.
+      if (userId) await markOnboardingCompleted(userId);
       wipeLocalSession();
+      if (userId) await rememberLastUserId(userId);
       await persist(tokens);
       set({ ...tokens, status: 'authenticated' });
     } catch (e) {
@@ -90,8 +101,9 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logout: async () => {
     const { refreshToken } = get();
-    // Limpa sessão + CMHL local na hora — não esperar a API.
+    // Limpa timeline local; “já fiz onboarding” permanece no SecureStore desta conta.
     wipeLocalSession();
+    clearOnboardingCache();
     await clearPersisted();
     set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
     if (refreshToken) {
@@ -101,6 +113,7 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   logoutLocalOnly: async () => {
     wipeLocalSession();
+    clearOnboardingCache();
     await clearPersisted();
     set({ accessToken: null, refreshToken: null, status: 'unauthenticated' });
   },

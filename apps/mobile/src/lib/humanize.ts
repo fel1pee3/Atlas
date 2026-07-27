@@ -109,9 +109,11 @@ export function insightThemeLabel(kind: string): string {
     case 'cross.sleep_after_late_workout':
       return 'Sono e treino';
     case 'activity.steps_trend':
+    case 'activity.steps_avg_summary':
     case 'activity.low_steps_streak':
       return 'Passos';
     case 'sleep.avg_summary':
+    case 'sleep.last_vs_avg':
     case 'sleep.short_streak':
     case 'sleep.below_baseline':
       return 'Sono';

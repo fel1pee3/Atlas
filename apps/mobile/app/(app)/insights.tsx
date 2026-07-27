@@ -21,6 +21,7 @@ import {
 
 /**
  * Feed de insights (docs/19 §7).
+ * Lista sempre vem de GET /insights — nunca do retorno parcial do generate.
  */
 export default function InsightsScreen() {
   const router = useRouter();
@@ -29,24 +30,10 @@ export default function InsightsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (regen: boolean) => {
+  const loadList = useCallback(async () => {
     setError(null);
     try {
       setItems(await listInsights());
-      setLoading(false);
-      if (regen) {
-        try {
-          const gen = await generateInsights();
-          if (gen.items?.length) setItems(gen.items);
-          else setItems(await listInsights());
-        } catch (err) {
-          if (isAbortLikeError(err)) {
-            setError('Geração demorou (rede). Lista atual mantida — puxe para tentar de novo.');
-          } else {
-            setError(err instanceof Error ? err.message : 'Falha ao gerar insights');
-          }
-        }
-      }
     } catch (err) {
       setError(
         isAbortLikeError(err)
@@ -55,21 +42,44 @@ export default function InsightsScreen() {
             ? err.message
             : 'Falha ao carregar insights',
       );
+    } finally {
       setLoading(false);
+    }
+  }, []);
+
+  /** Regenera no servidor e recarrega o feed completo (estável). */
+  const regenerate = useCallback(async () => {
+    setError(null);
+    try {
+      await generateInsights();
+      setItems(await listInsights());
+    } catch (err) {
+      if (isAbortLikeError(err)) {
+        setError('Geração demorou (rede). Lista atual mantida — puxe para tentar de novo.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Falha ao gerar insights');
+      }
+      // Mantém o que já estava na tela; tenta refrescar lista mesmo assim.
+      try {
+        setItems(await listInsights());
+      } catch {
+        /* ignore */
+      }
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      void load(true);
-    }, [load]),
+      // Só lista ao focar — generate fica no auto-sync + pull-to-refresh.
+      void loadList();
+    }, [loadList]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load(true);
+    await regenerate();
     setRefreshing(false);
-  }, [load]);
+  }, [regenerate]);
 
   if (loading) {
     return (
@@ -94,16 +104,19 @@ export default function InsightsScreen() {
           />
         }
         ListHeaderComponent={
-          <Caption style={styles.lead}>
-            Observações com evidências da sua timeline — sono, passos, agenda, humor e gastos.
-          </Caption>
+          <View>
+            <Caption style={styles.lead}>
+              Observações com evidências da sua timeline — sono, passos, agenda, humor e gastos.
+            </Caption>
+            {error ? <Caption style={styles.error}>{error}</Caption> : null}
+          </View>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Title style={styles.emptyTitle}>Ainda observando</Title>
             <Body tone="muted" style={styles.emptyText}>
               {error ??
-                'Conecte Saúde e Fontes. Os padrões precisam de alguns dias de dados.'}
+                'Conecte Saúde e Fontes. Os padrões precisam de alguns dias de dados. Puxe para atualizar.'}
             </Body>
           </View>
         }
@@ -130,6 +143,11 @@ const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center' },
   list: { ...pagePad, flexGrow: 1 },
   lead: { marginBottom: spacing.md, lineHeight: 20 },
+  error: {
+    color: colors.danger,
+    marginBottom: spacing.md,
+    lineHeight: 20,
+  },
   empty: { paddingTop: spacing.xl, gap: spacing.sm },
   emptyTitle: { fontSize: font.size.lg },
   emptyText: { lineHeight: 22, maxWidth: 300 },

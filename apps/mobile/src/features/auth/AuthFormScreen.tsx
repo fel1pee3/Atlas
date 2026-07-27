@@ -112,7 +112,11 @@ export function AuthFormScreen({ mode }: Props) {
             placeholder="E-mail"
             autoCapitalize="none"
             keyboardType="email-address"
-            autoComplete="email"
+            autoCorrect={false}
+            spellCheck={false}
+            autoComplete="off"
+            textContentType="none"
+            importantForAutofill="no"
             value={email}
             onChangeText={(v) => {
               setEmail(v);
@@ -122,8 +126,12 @@ export function AuthFormScreen({ mode }: Props) {
             accessibilityLabel="E-mail"
           />
           <PasswordField
-            placeholder={isLogin ? 'Senha' : 'Senha'}
-            autoComplete={isLogin ? 'password' : 'new-password'}
+            placeholder="Senha"
+            autoCorrect={false}
+            spellCheck={false}
+            autoComplete="off"
+            textContentType="none"
+            importantForAutofill="no"
             value={password}
             onChangeText={(v) => {
               setPassword(v);
@@ -137,7 +145,11 @@ export function AuthFormScreen({ mode }: Props) {
             <>
               <PasswordField
                 placeholder="Confirmar senha"
-                autoComplete="new-password"
+                autoCorrect={false}
+                spellCheck={false}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
                 value={confirm}
                 onChangeText={(v) => {
                   setConfirm(v);

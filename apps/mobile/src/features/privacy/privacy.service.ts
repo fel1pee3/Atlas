@@ -8,7 +8,9 @@ import {
 import { accountApi, api } from '../../lib/api';
 import { getDb } from '../../db/client';
 import { events } from '../../db/schema';
+import { userIdFromAccessToken } from '../../lib/jwt';
 import { useAuth } from '../../state/auth.store';
+import { clearOnboardingForUser } from '../onboarding/onboarding.service';
 import { wipeLocalSession } from '../session/wipe-local-session';
 
 /**
@@ -66,8 +68,9 @@ export async function exportAndShare(): Promise<{ counts: Record<string, number>
  * Delete real: servidor (cascade) → limpa SQLite → limpa tokens.
  */
 export async function deleteAccountAndWipe(): Promise<void> {
+  const userId = userIdFromAccessToken(useAuth.getState().accessToken);
   await accountApi.delete();
-  // logoutLocalOnly também dá wipe; chama antes só para garantir ordem explícita.
+  if (userId) await clearOnboardingForUser(userId);
   wipeLocalSession();
   await useAuth.getState().logoutLocalOnly();
 }

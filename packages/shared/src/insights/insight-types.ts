@@ -6,8 +6,10 @@
 export const INSIGHT_KINDS = {
   // --- M3 intra-domínio ---
   SLEEP_AVG_SUMMARY: 'sleep.avg_summary',
+  SLEEP_LAST_VS_AVG: 'sleep.last_vs_avg',
   SLEEP_SHORT_STREAK: 'sleep.short_streak',
   SLEEP_BELOW_BASELINE: 'sleep.below_baseline',
+  ACTIVITY_STEPS_AVG_SUMMARY: 'activity.steps_avg_summary',
   ACTIVITY_STEPS_TREND: 'activity.steps_trend',
   ACTIVITY_LOW_STEPS_STREAK: 'activity.low_steps_streak',
 
