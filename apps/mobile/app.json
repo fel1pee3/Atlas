@@ -8,10 +8,6 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
     "icon": "./assets/brand/icon.png",
-    "splash": {
-      "backgroundColor": "#EEF2F4",
-      "resizeMode": "contain"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.atlas.app",
@@ -74,13 +70,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#EEF2F4",
-          "ios": {
-            "backgroundColor": "#EEF2F4"
-          },
-          "android": {
-            "backgroundColor": "#EEF2F4"
-          }
+          "image": "./assets/brand/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#EEF2F4"
         }
       ]
     ],
